@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a3a5c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2a5a8c;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8652d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff7f4f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Logo Icon: Stylized document with checkmark -->
+  <g transform="translate(15, 10)">
+    <!-- Document shape -->
+    <rect x="8" y="5" width="58" height="75" rx="8" ry="8" fill="url(#grad1)" />
+    <!-- Folded corner -->
+    <path d="M48 5 L66 23 L48 23 Z" fill="#2a5a8c" opacity="0.6"/>
+    <path d="M48 5 L66 23" stroke="rgba(255,255,255,0.3)" stroke-width="1" fill="none"/>
+
+    <!-- Lines on document -->
+    <rect x="20" y="32" width="34" height="3" rx="1.5" fill="rgba(255,255,255,0.35)" />
+    <rect x="20" y="40" width="28" height="3" rx="1.5" fill="rgba(255,255,255,0.25)" />
+    <rect x="20" y="48" width="32" height="3" rx="1.5" fill="rgba(255,255,255,0.25)" />
+
+    <!-- Accent checkmark circle -->
+    <circle cx="44" cy="64" r="12" fill="url(#grad2)" />
+    <polyline points="38,64 42,68 50,59" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Text: QuoteMaster -->
+  <text x="105" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="36" font-weight="800" fill="#1a3a5c" letter-spacing="-1">
+    Quote<tspan fill="#e8652d">Master</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="107" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="13" font-weight="500" fill="#6b7280" letter-spacing="2">
+    BILL &amp; QUOTATION GENERATOR
+  </text>
+</svg>
