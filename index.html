@@ -1514,34 +1514,34 @@ async function clearAllData() {
   }
 }
 
-// ===== SHARE AS IMAGE — Captures only quotation area =====
+// ===== SHARE AS IMAGE — Pure canvas rendering, works on all mobile browsers =====
 async function shareAsImage() {
   showToast('Creating image...');
-  var content = document.getElementById('pdfContent');
-  if (!content) { showToast('Nothing to share'); return; }
-
   try {
-    var canvas = await renderToCanvas(content);
+    var data = collectDocData();
+    var canvas = renderBillToCanvas(data);
     var blob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
-    var docData = collectDocData();
-    var fileName = (docData.type === 'quotation' ? 'Quotation' : 'Bill') + '_' + (docData.customer.name || 'doc').replace(/\s+/g, '_') + '.png';
+    if (!blob) { showToast('Could not create image'); return; }
+    var fileName = (data.type === 'quotation' ? 'Quotation' : 'Bill') + '_' + (data.customer.name || 'doc').replace(/\s+/g, '_') + '.png';
 
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
+    if (navigator.share && navigator.canShare) {
       var file = new File([blob], fileName, { type: 'image/png' });
-      await navigator.share({ files: [file], title: fileName });
-      showToast('Shared!');
-    } else {
-      // Fallback: download the image
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Image downloaded!');
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: fileName });
+        showToast('Shared!');
+        return;
+      }
     }
+    // Fallback: download the image
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+    showToast('Image downloaded!');
   } catch(err) {
     console.error('Share image error:', err);
     if (err.name !== 'AbortError') {
@@ -1550,222 +1550,436 @@ async function shareAsImage() {
   }
 }
 
-// Render an HTML element to canvas (no external library needed)
-function renderToCanvas(el) {
-  return new Promise(function(resolve, reject) {
-    var rect = el.getBoundingClientRect();
-    var scale = 2; // retina quality
-    var w = rect.width;
-    var h = rect.height;
-
-    // Clone element so we can style it independently
-    var clone = el.cloneNode(true);
-    clone.style.width = w + 'px';
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '0';
-    clone.style.background = '#ffffff';
-    document.body.appendChild(clone);
-
-    // Get computed styles from original and inline them into clone
-    inlineAllStyles(el, clone);
-
-    // Serialize to XML for foreignObject
-    var serializer = new XMLSerializer();
-    var htmlStr = serializer.serializeToString(clone);
-    document.body.removeChild(clone);
-
-    // Build SVG with foreignObject
-    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      htmlStr +
-      '</foreignObject></svg>';
-
-    var svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    var url = URL.createObjectURL(svgBlob);
-
-    var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      canvas.width = w * scale;
-      canvas.height = h * scale;
-      var ctx = canvas.getContext('2d');
-      ctx.scale(scale, scale);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    img.onerror = function(e) {
-      URL.revokeObjectURL(url);
-      // Fallback: draw text-based image on canvas
-      resolve(renderTextToCanvas(collectDocData()));
-    };
-    img.src = url;
-  });
+// Helper: wrap text to fit within maxWidth, returns array of lines
+function wrapText(ctx, text, maxWidth) {
+  if (!text) return [];
+  var words = text.split(' ');
+  var lines = [];
+  var line = '';
+  for (var i = 0; i < words.length; i++) {
+    var test = line ? line + ' ' + words[i] : words[i];
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = words[i];
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
-// Inline all computed styles into cloned elements
-function inlineAllStyles(orig, clone) {
-  var origChildren = orig.children;
-  var cloneChildren = clone.children;
-  var computed = window.getComputedStyle(orig);
-  var important = ['font-family','font-size','font-weight','color','background-color','background',
-    'border','border-radius','padding','margin','text-align','line-height','display',
-    'flex-direction','justify-content','align-items','gap','width','max-width',
-    'border-bottom','border-top','border-collapse','white-space','overflow','box-sizing',
-    'grid-template-columns','flex'];
-  for (var i = 0; i < important.length; i++) {
-    try { clone.style[important[i]] = computed[important[i]]; } catch(e) {}
+// Helper: truncate text with ellipsis if too wide
+function truncateText(ctx, text, maxWidth) {
+  if (!text) return '-';
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  var t = text;
+  while (t.length > 0 && ctx.measureText(t + '...').width > maxWidth) {
+    t = t.substring(0, t.length - 1);
   }
-  for (var j = 0; j < origChildren.length && j < cloneChildren.length; j++) {
-    inlineAllStyles(origChildren[j], cloneChildren[j]);
-  }
+  return t + '...';
 }
 
-// Fallback: render quotation as a nicely drawn canvas image
-function renderTextToCanvas(data) {
+// Pure canvas rendering of bill — works on ALL mobile browsers
+function renderBillToCanvas(data) {
   var cur = settings.currency;
+  var items = data.items.filter(function(it) { return it.desc || it.rate; });
   var subtotal = data.items.reduce(function(s, it) { return s + it.total; }, 0);
   var afterDiscount = subtotal - data.discount;
   var tax = afterDiscount * (data.taxPercent / 100);
   var grand = afterDiscount + tax + data.extraCharges;
   var typeName = data.type === 'quotation' ? 'QUOTATION' : 'BILL / INVOICE';
+  var dateFormatted = data.date || '-';
+  try { if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch(e) {}
 
+  // Use 2x scale for retina quality
+  var scale = 2;
+  var W = 700;
+  var pad = 36;
+  var innerW = W - pad * 2;
+  var font = 'Arial, Helvetica, sans-serif';
+
+  // First pass: measure height needed
   var canvas = document.createElement('canvas');
-  var W = 700, pad = 40, y = pad;
-  canvas.width = W;
+  canvas.width = W * scale;
   var ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
 
-  // Estimate height first
-  var lineH = 22, headerH = 120, itemH = data.items.length * 30 + 60, totalH = 100, footerH = 80;
-  var H = headerH + 80 + itemH + totalH + footerH + pad * 2 + 40;
-  canvas.height = H;
+  var y = 0;
+
+  // ---- HEADER BAR (business info + doc type) ----
+  var headerH = 72;
+  y += headerH;
+
+  // ---- Business details under header ----
+  y += 12;
+  var bizDetails = [];
+  if (settings.bizOwner) bizDetails.push(settings.bizOwner);
+  if (settings.bizEmail) bizDetails.push('Email: ' + settings.bizEmail);
+  if (settings.bizAddress) bizDetails.push('Addr: ' + settings.bizAddress);
+  if (settings.bizGST) bizDetails.push('GST: ' + settings.bizGST);
+  if (bizDetails.length > 0) {
+    y += bizDetails.length * 16 + 10;
+  }
+
+  // ---- Date + Doc number row ----
+  y += 22;
+
+  // ---- Customer section ----
+  y += 8;
+  var custSectionH = 28; // label + name
+  if (data.customer.name) custSectionH += 20;
+  if (data.customer.phone) custSectionH += 16;
+  if (data.customer.address) {
+    ctx.font = '12px ' + font;
+    var addrLines = wrapText(ctx, data.customer.address, innerW - 20);
+    custSectionH += addrLines.length * 15;
+  }
+  custSectionH += 12; // padding
+  y += custSectionH + 15;
+
+  // ---- Items table ----
+  var tableHeaderH = 30;
+  var rowH = 28;
+  // Check for items with long descriptions that need wrapping
+  var itemHeights = [];
+  ctx.font = '12px ' + font;
+  var descColW = innerW * 0.42;
+  items.forEach(function(it) {
+    var lines = wrapText(ctx, it.desc || '-', descColW);
+    var h = Math.max(rowH, lines.length * 16 + 12);
+    itemHeights.push({ lines: lines, height: h });
+  });
+  var tableBodyH = 0;
+  itemHeights.forEach(function(ih) { tableBodyH += ih.height; });
+  y += tableHeaderH + tableBodyH + 15;
+
+  // ---- Totals ----
+  var totalLines = 1; // subtotal
+  if (data.discount > 0) totalLines++;
+  if (data.taxPercent > 0) totalLines++;
+  if (data.extraCharges > 0) totalLines++;
+  y += totalLines * 22 + 45; // totals + grand total
+
+  // ---- Notes ----
+  if (data.notes) {
+    ctx.font = '11px ' + font;
+    var noteLines = wrapText(ctx, data.notes, innerW - 20);
+    y += 30 + noteLines.length * 14 + 12;
+  }
+
+  // ---- Footer ----
+  y += 40;
+  if (settings.bizPhone) y += 16;
+  y += 20; // bottom padding
+
+  // Now set canvas height and redraw
+  var H = y;
+  canvas.height = H * scale;
+  ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  // ===================== DRAW =====================
+  y = 0;
 
   // Background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  // Header bar
+  // ---- HEADER BAR ----
   ctx.fillStyle = '#1a3a5c';
-  ctx.fillRect(0, 0, W, 70);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 22px -apple-system, Arial, sans-serif';
-  ctx.fillText(settings.bizName || 'QuoteMaster', pad, 35);
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  if (settings.bizPhone) ctx.fillText('Ph: ' + settings.bizPhone, pad, 55);
+  ctx.fillRect(0, 0, W, headerH);
 
-  // Doc type
-  ctx.fillStyle = '#e8652d';
-  ctx.font = 'bold 24px -apple-system, Arial, sans-serif';
+  // Business name (left)
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 22px ' + font;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(settings.bizName || 'QuoteMaster', pad, 28);
+  ctx.font = '12px ' + font;
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  if (settings.bizPhone) ctx.fillText('Ph: ' + settings.bizPhone, pad, 50);
+
+  // Doc type (right)
+  ctx.fillStyle = '#ff7f4f';
+  ctx.font = 'bold 22px ' + font;
   ctx.textAlign = 'right';
-  ctx.fillText(typeName, W - pad, 35);
-  ctx.fillStyle = '#666666';
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  ctx.fillText('#' + (data.number || '-'), W - pad, 55);
+  ctx.fillText(typeName, W - pad, 28);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '12px ' + font;
+  ctx.fillText('#' + (data.number || '-'), W - pad, 50);
   ctx.textAlign = 'left';
 
-  y = 90;
+  // Orange accent line under header
+  ctx.fillStyle = '#e8652d';
+  ctx.fillRect(0, headerH, W, 3);
+  y = headerH + 3;
 
-  // Date
-  var dateFormatted = data.date || '-';
-  try { if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch(e) {}
+  // ---- Business details ----
+  if (bizDetails.length > 0) {
+    y += 10;
+    ctx.font = '11px ' + font;
+    ctx.fillStyle = '#666666';
+    bizDetails.forEach(function(d) {
+      ctx.fillText(d, pad, y + 10);
+      y += 16;
+    });
+    y += 4;
+  } else {
+    y += 12;
+  }
+
+  // ---- Date row ----
   ctx.fillStyle = '#333333';
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  ctx.fillText('Date: ' + dateFormatted, pad, y);
-  y += 25;
+  ctx.font = '12px ' + font;
+  ctx.fillText('Date: ' + dateFormatted, pad, y + 12);
+  ctx.textAlign = 'right';
+  ctx.fillText('Doc #: ' + (data.number || '-'), W - pad, y + 12);
+  ctx.textAlign = 'left';
+  y += 28;
 
-  // Customer
+  // ---- Customer section ----
+  var custY = y;
+  ctx.fillStyle = '#f0f4f8';
+  var custBoxH = custSectionH;
+  // Rounded rect for customer section
+  var cR = 6;
+  ctx.beginPath();
+  ctx.moveTo(pad + cR, custY);
+  ctx.lineTo(W - pad - cR, custY);
+  ctx.quadraticCurveTo(W - pad, custY, W - pad, custY + cR);
+  ctx.lineTo(W - pad, custY + custBoxH - cR);
+  ctx.quadraticCurveTo(W - pad, custY + custBoxH, W - pad - cR, custY + custBoxH);
+  ctx.lineTo(pad + cR, custY + custBoxH);
+  ctx.quadraticCurveTo(pad, custY + custBoxH, pad, custY + custBoxH - cR);
+  ctx.lineTo(pad, custY + cR);
+  ctx.quadraticCurveTo(pad, custY, pad + cR, custY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Left accent bar on customer box
+  ctx.fillStyle = '#e8652d';
+  ctx.fillRect(pad, custY + 4, 3, custBoxH - 8);
+
+  y = custY + 14;
+  ctx.fillStyle = '#999999';
+  ctx.font = 'bold 10px ' + font;
+  ctx.fillText('BILL TO:', pad + 14, y);
+  y += 16;
   ctx.fillStyle = '#1a3a5c';
-  ctx.font = 'bold 14px -apple-system, Arial, sans-serif';
-  ctx.fillText('BILL TO:', pad, y); y += 20;
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 16px -apple-system, Arial, sans-serif';
-  ctx.fillText(data.customer.name || '-', pad, y); y += 18;
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  ctx.fillStyle = '#666666';
-  if (data.customer.phone) { ctx.fillText('Ph: ' + data.customer.phone, pad, y); y += 16; }
-  if (data.customer.address) { ctx.fillText('Addr: ' + data.customer.address, pad, y); y += 16; }
-  y += 15;
+  ctx.font = 'bold 15px ' + font;
+  ctx.fillText(data.customer.name || '-', pad + 14, y);
+  y += 18;
+  ctx.font = '12px ' + font;
+  ctx.fillStyle = '#555555';
+  if (data.customer.phone) { ctx.fillText('Ph: ' + data.customer.phone, pad + 14, y); y += 16; }
+  if (data.customer.address) {
+    ctx.font = '12px ' + font;
+    var addrLines = wrapText(ctx, 'Addr: ' + data.customer.address, innerW - 28);
+    addrLines.forEach(function(line) {
+      ctx.fillText(line, pad + 14, y);
+      y += 15;
+    });
+  }
+  y = custY + custBoxH + 15;
+
+  // ---- ITEMS TABLE ----
+  var tableX = pad;
+  var tableW = innerW;
+
+  // Column positions (proportional)
+  var colHash = tableX + 8;
+  var colDesc = tableX + tableW * 0.06;
+  var colQty = tableX + tableW * 0.52;
+  var colRate = tableX + tableW * 0.65;
+  var colAmt = tableX + tableW - 8;
 
   // Table header
   ctx.fillStyle = '#1a3a5c';
-  ctx.fillRect(pad, y, W - pad * 2, 28);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 11px -apple-system, Arial, sans-serif';
-  var cols = [pad + 8, pad + 40, pad + 340, pad + 440, pad + 540];
-  ctx.fillText('#', cols[0], y + 18);
-  ctx.fillText('Description', cols[1], y + 18);
-  ctx.fillText('Qty', cols[2], y + 18);
-  ctx.fillText('Rate', cols[3], y + 18);
-  ctx.textAlign = 'right';
-  ctx.fillText('Amount', W - pad - 8, y + 18);
-  ctx.textAlign = 'left';
-  y += 32;
+  var thR = 4;
+  ctx.beginPath();
+  ctx.moveTo(tableX + thR, y);
+  ctx.lineTo(tableX + tableW - thR, y);
+  ctx.quadraticCurveTo(tableX + tableW, y, tableX + tableW, y + thR);
+  ctx.lineTo(tableX + tableW, y + tableHeaderH - thR);
+  ctx.quadraticCurveTo(tableX + tableW, y + tableHeaderH, tableX + tableW - thR, y + tableHeaderH);
+  ctx.lineTo(tableX + thR, y + tableHeaderH);
+  ctx.quadraticCurveTo(tableX, y + tableHeaderH, tableX, y + tableHeaderH - thR);
+  ctx.lineTo(tableX, y + thR);
+  ctx.quadraticCurveTo(tableX, y, tableX + thR, y);
+  ctx.closePath();
+  ctx.fill();
 
-  // Items
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  data.items.filter(function(it) { return it.desc || it.rate; }).forEach(function(it, i) {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px ' + font;
+  ctx.textAlign = 'left';
+  ctx.fillText('#', colHash, y + 19);
+  ctx.fillText('Description', colDesc, y + 19);
+  ctx.fillText('Qty', colQty, y + 19);
+  ctx.fillText('Rate', colRate, y + 19);
+  ctx.textAlign = 'right';
+  ctx.fillText('Amount', colAmt, y + 19);
+  ctx.textAlign = 'left';
+  y += tableHeaderH;
+
+  // Table rows
+  items.forEach(function(it, i) {
+    var ih = itemHeights[i];
+    var rh = ih.height;
+
+    // Alternating row background
     ctx.fillStyle = i % 2 === 0 ? '#f8fafc' : '#ffffff';
-    ctx.fillRect(pad, y - 2, W - pad * 2, 26);
+    ctx.fillRect(tableX, y, tableW, rh);
+
+    // Row border
+    ctx.strokeStyle = '#e8ecf0';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(tableX, y + rh);
+    ctx.lineTo(tableX + tableW, y + rh);
+    ctx.stroke();
+
     ctx.fillStyle = '#333333';
-    ctx.fillText((i + 1) + '', cols[0], y + 15);
-    ctx.fillText((it.desc || '-').substring(0, 35), cols[1], y + 15);
-    ctx.fillText(it.qty + '', cols[2], y + 15);
-    ctx.fillText(cur + it.rate.toFixed(2), cols[3], y + 15);
-    ctx.textAlign = 'right';
-    ctx.fillText(cur + it.total.toFixed(2), W - pad - 8, y + 15);
+    ctx.font = '12px ' + font;
+    var textY = y + 18;
+
+    // Item number
     ctx.textAlign = 'left';
-    y += 26;
+    ctx.fillText((i + 1) + '', colHash, textY);
+
+    // Description (with wrapping)
+    ih.lines.forEach(function(line, li) {
+      ctx.fillText(line, colDesc, textY + li * 16);
+    });
+
+    // Qty
+    ctx.fillText(it.qty + '', colQty, textY);
+
+    // Rate
+    ctx.fillText(cur + it.rate.toFixed(2), colRate, textY);
+
+    // Amount (right aligned)
+    ctx.textAlign = 'right';
+    ctx.font = 'bold 12px ' + font;
+    ctx.fillText(cur + it.total.toFixed(2), colAmt, textY);
+    ctx.textAlign = 'left';
+    ctx.font = '12px ' + font;
+
+    y += rh;
   });
 
-  y += 10;
-  // Line
-  ctx.strokeStyle = '#e2e5ea';
-  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
-  y += 15;
+  y += 12;
 
-  // Totals
-  ctx.font = '13px -apple-system, Arial, sans-serif';
-  ctx.fillStyle = '#333333';
-  ctx.textAlign = 'right';
-  ctx.fillText('Subtotal:  ' + cur + subtotal.toFixed(2), W - pad, y); y += 20;
-  if (data.discount > 0) { ctx.fillText('Discount:  -' + cur + data.discount.toFixed(2), W - pad, y); y += 20; }
-  if (data.taxPercent > 0) { ctx.fillText('Tax (' + data.taxPercent + '%):  ' + cur + tax.toFixed(2), W - pad, y); y += 20; }
-  if (data.extraCharges > 0) { ctx.fillText('Extra:  ' + cur + data.extraCharges.toFixed(2), W - pad, y); y += 20; }
+  // ---- TOTALS SECTION ----
+  var totalsX = W - pad - 220;
+  var totalsW = 220;
 
-  // Grand total
-  y += 5;
-  ctx.strokeStyle = '#1a3a5c'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(W - pad - 220, y); ctx.lineTo(W - pad, y); ctx.stroke();
-  y += 22;
-  ctx.fillStyle = '#e8652d';
-  ctx.font = 'bold 18px -apple-system, Arial, sans-serif';
-  ctx.fillText('TOTAL:  ' + cur + grand.toFixed(2), W - pad, y);
+  // Separator
+  ctx.strokeStyle = '#d0d5dc';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(totalsX, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  y += 8;
+
+  ctx.font = '13px ' + font;
+  ctx.fillStyle = '#555555';
+
+  function drawTotalRow(label, value, bold) {
+    ctx.textAlign = 'left';
+    ctx.font = (bold ? 'bold ' : '') + '13px ' + font;
+    ctx.fillText(label, totalsX, y + 14);
+    ctx.textAlign = 'right';
+    ctx.fillText(value, W - pad, y + 14);
+    ctx.textAlign = 'left';
+    y += 22;
+  }
+
+  drawTotalRow('Subtotal', cur + subtotal.toFixed(2), false);
+  if (data.discount > 0) {
+    ctx.fillStyle = '#e8652d';
+    drawTotalRow('Discount', '-' + cur + data.discount.toFixed(2), false);
+    ctx.fillStyle = '#555555';
+  }
+  if (data.taxPercent > 0) drawTotalRow('Tax (' + data.taxPercent + '%)', cur + tax.toFixed(2), false);
+  if (data.extraCharges > 0) drawTotalRow('Extra Charges', cur + data.extraCharges.toFixed(2), false);
+
+  // Grand total with background
+  y += 4;
+  ctx.fillStyle = '#1a3a5c';
+  ctx.beginPath();
+  ctx.moveTo(totalsX + 2, y);
+  ctx.lineTo(W - pad - 2, y);
+  ctx.quadraticCurveTo(W - pad, y, W - pad, y + 2);
+  ctx.lineTo(W - pad, y + 30);
+  ctx.quadraticCurveTo(W - pad, y + 32, W - pad - 2, y + 32);
+  ctx.lineTo(totalsX + 2, y + 32);
+  ctx.quadraticCurveTo(totalsX, y + 32, totalsX, y + 30);
+  ctx.lineTo(totalsX, y + 2);
+  ctx.quadraticCurveTo(totalsX, y, totalsX + 2, y);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 14px ' + font;
   ctx.textAlign = 'left';
-  y += 30;
+  ctx.fillText('TOTAL', totalsX + 10, y + 20);
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 16px ' + font;
+  ctx.fillText(cur + grand.toFixed(2), W - pad - 10, y + 21);
+  ctx.textAlign = 'left';
+  y += 40;
 
-  // Footer
-  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+  // ---- NOTES ----
+  if (data.notes) {
+    ctx.fillStyle = '#f8f9fa';
+    ctx.font = '11px ' + font;
+    var noteLines = wrapText(ctx, data.notes, innerW - 24);
+    var noteBoxH = 22 + noteLines.length * 14 + 10;
+    ctx.fillRect(pad, y, innerW, noteBoxH);
+    ctx.strokeStyle = '#e2e5ea';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pad, y, innerW, noteBoxH);
+
+    ctx.fillStyle = '#888888';
+    ctx.font = 'bold 10px ' + font;
+    ctx.fillText('NOTES / TERMS:', pad + 10, y + 14);
+    ctx.font = '11px ' + font;
+    ctx.fillStyle = '#555555';
+    noteLines.forEach(function(line, li) {
+      ctx.fillText(line, pad + 10, y + 28 + li * 14);
+    });
+    y += noteBoxH + 8;
+  }
+
+  // ---- FOOTER ----
+  y += 6;
+  ctx.strokeStyle = '#e2e5ea';
+  ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
-  y += 20;
+  y += 18;
   ctx.fillStyle = '#e8652d';
-  ctx.font = 'bold 15px -apple-system, Arial, sans-serif';
+  ctx.font = 'bold 14px ' + font;
   ctx.textAlign = 'center';
   ctx.fillText(settings.thankMsg || 'Thank you for your business!', W / 2, y);
-  y += 18;
+  y += 16;
   if (settings.bizPhone) {
     ctx.fillStyle = '#999999';
-    ctx.font = '11px -apple-system, Arial, sans-serif';
+    ctx.font = '11px ' + font;
     ctx.fillText('Contact: ' + settings.bizPhone, W / 2, y);
+    y += 14;
+  }
+  if (settings.bizEmail) {
+    ctx.fillStyle = '#999999';
+    ctx.font = '11px ' + font;
+    ctx.fillText(settings.bizEmail, W / 2, y);
+    y += 14;
   }
   ctx.textAlign = 'left';
+  y += 10;
 
-  // Trim canvas to actual content height
+  // ---- Trim canvas to actual content ----
   var finalCanvas = document.createElement('canvas');
-  finalCanvas.width = W;
-  finalCanvas.height = y + 30;
+  finalCanvas.width = W * scale;
+  finalCanvas.height = y * scale;
   var fctx = finalCanvas.getContext('2d');
   fctx.drawImage(canvas, 0, 0);
 
@@ -1976,7 +2190,7 @@ window.addEventListener('appinstalled', function() {
 });
 
 // ===== SERVICE WORKER REGISTRATION WITH AUTO-UPDATE =====
-const APP_VERSION = 'v3';
+const APP_VERSION = 'v4';
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function() {
