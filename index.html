@@ -1621,29 +1621,40 @@ async function shareAsImage() {
     if (!blob) { showToast('Could not create image'); return; }
     var fileName = (data.type === 'quotation' ? 'Quotation' : 'Bill') + '_' + (data.customer.name || 'doc').replace(/\s+/g, '_') + '.png';
 
+    // Try native share (mobile)
+    var shared = false;
     if (navigator.share && navigator.canShare) {
-      var file = new File([blob], fileName, { type: 'image/png' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: fileName });
-        showToast('Shared!');
-        return;
+      try {
+        var file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fileName });
+          shared = true;
+          showToast('Shared!');
+        }
+      } catch(shareErr) {
+        // User cancelled or share failed — don't also download
+        if (shareErr.name === 'AbortError') {
+          return; // User cancelled, do nothing
+        }
+        console.log('Share failed, falling back to download:', shareErr.message);
       }
     }
-    // Fallback: download the image
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
-    showToast('Image downloaded!');
+
+    // Fallback: download only if native share was not used
+    if (!shared) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+      showToast('Image downloaded!');
+    }
   } catch(err) {
     console.error('Share image error:', err);
-    if (err.name !== 'AbortError') {
-      showToast('Could not create image');
-    }
+    showToast('Could not create image');
   }
 }
 
@@ -2287,7 +2298,7 @@ window.addEventListener('appinstalled', function() {
 });
 
 // ===== SERVICE WORKER REGISTRATION WITH AUTO-UPDATE =====
-const APP_VERSION = 'v5';
+const APP_VERSION = 'v6';
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function() {
