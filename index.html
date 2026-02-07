@@ -778,7 +778,7 @@ html, body {
       <span class="nav-icon">&#127968;</span>
       Home
     </button>
-    <button class="nav-btn" onclick="showScreen('create')" data-screen="create">
+    <button class="nav-btn" onclick="handleCreateNav()" data-screen="create">
       <span class="nav-icon">&#10133;</span>
       Create
     </button>
@@ -971,6 +971,30 @@ function showScreen(name) {
   if (name === 'settings') populateSettings();
 }
 
+// Handle Create tab in bottom nav — ask to discard if editing
+function handleCreateNav() {
+  // If currently on create screen and has data or editing, ask to discard
+  var createScreen = document.getElementById('screen-create');
+  var isOnCreateScreen = createScreen && createScreen.classList.contains('active');
+
+  if (isOnCreateScreen && (editingId !== null || formHasData())) {
+    showDiscardConfirm(function() {
+      // Start fresh with whichever type was last active
+      var activeType = document.querySelector('.switch-opt.active');
+      var type = (activeType && activeType.textContent.toLowerCase().indexOf('bill') >= 0) ? 'bill' : 'quotation';
+      resetAndCreateNew(type);
+    });
+  } else if (!isOnCreateScreen && editingId !== null) {
+    // Coming from another screen while editing — ask to discard or continue editing
+    showDiscardConfirm(function() {
+      var type = currentDoc.type || 'quotation';
+      resetAndCreateNew(type);
+    });
+  } else {
+    showScreen('create');
+  }
+}
+
 // ===== DOC TYPE =====
 function setDocType(type, btn) {
   currentDoc.type = type;
@@ -978,7 +1002,27 @@ function setDocType(type, btn) {
   btn.classList.add('active');
 }
 
+// Check if the create form has meaningful data entered
+function formHasData() {
+  var name = (document.getElementById('custName').value || '').trim();
+  var phone = (document.getElementById('custPhone').value || '').trim();
+  var items = getItems();
+  var hasItems = items.some(function(it) { return (it.desc && it.desc.trim()) || it.rate > 0; });
+  return !!(name || phone || hasItems);
+}
+
 function startNew(type) {
+  // If already editing or form has data, ask to discard
+  if (editingId !== null || formHasData()) {
+    showDiscardConfirm(function() {
+      resetAndCreateNew(type);
+    });
+    return;
+  }
+  resetAndCreateNew(type);
+}
+
+function resetAndCreateNew(type) {
   editingId = null;
   currentDoc = { type, customer: {}, items: [], discount: 0, taxPercent: 0, extraCharges: 0, notes: '', date: '', number: '' };
   showScreen('create');
@@ -1002,10 +1046,63 @@ function startNew(type) {
   btns[type === 'quotation' ? 0 : 1].classList.add('active');
 }
 
+// Discard confirmation modal
+function showDiscardConfirm(onConfirm) {
+  // Remove existing modal if any
+  var existing = document.getElementById('discardModal');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'discardModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn 0.2s ease';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:14px;padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)';
+
+  box.innerHTML =
+    '<div style="font-size:40px;margin-bottom:8px">&#9888;&#65039;</div>' +
+    '<div style="font-size:17px;font-weight:700;color:#1a3a5c;margin-bottom:8px">Unsaved Changes</div>' +
+    '<div style="font-size:14px;color:#666;margin-bottom:20px;line-height:1.4">You have unsaved changes in the current document. Do you want to discard them and start fresh?</div>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button id="discardCancel" style="flex:1;padding:12px;border-radius:8px;border:2px solid #e2e5ea;background:#fff;color:#333;font-size:14px;font-weight:600;cursor:pointer">Cancel</button>' +
+      '<button id="discardConfirm" style="flex:1;padding:12px;border-radius:8px;border:none;background:#e8652d;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Discard</button>' +
+    '</div>';
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Close on overlay click
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.getElementById('discardCancel').addEventListener('click', function() {
+    overlay.remove();
+  });
+
+  document.getElementById('discardConfirm').addEventListener('click', function() {
+    overlay.remove();
+    onConfirm();
+  });
+}
+
 function generateDocNumber(type) {
-  const prefix = type === 'quotation' ? 'QT' : 'BL';
-  const count = savedDocs.filter(d => d.type === type).length + 1;
-  return prefix + '-' + String(count).padStart(4, '0');
+  var prefix = type === 'quotation' ? 'QT' : 'BL';
+  var maxNum = 0;
+
+  // Find the highest existing number for this type
+  savedDocs.forEach(function(d) {
+    if (d.type === type && d.number) {
+      // Try to extract number from formats like QT-0001, BL-0023, or just 0001
+      var match = d.number.match(/(\d+)\s*$/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+  });
+
+  return prefix + '-' + String(maxNum + 1).padStart(4, '0');
 }
 
 // ===== ITEMS =====
@@ -2190,7 +2287,7 @@ window.addEventListener('appinstalled', function() {
 });
 
 // ===== SERVICE WORKER REGISTRATION WITH AUTO-UPDATE =====
-const APP_VERSION = 'v4';
+const APP_VERSION = 'v5';
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function() {
