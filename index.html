@@ -682,7 +682,7 @@ html, body {
       <button class="btn btn-outline" onclick="showScreen('create')">&#9999;&#65039; Edit</button>
       <button class="btn btn-primary" onclick="shareAsImage()">&#128247; Share as Image</button>
     </div>
-    <button class="btn btn-success" onclick="shareAsText()" style="margin-top:10px">&#128228; Share via WhatsApp</button>
+    <button class="btn btn-secondary" onclick="generatePDF()" style="margin-top:10px">&#128196; Download PDF</button>
   </div>
 
   <!-- ===== SAVED SCREEN ===== -->
@@ -1514,69 +1514,118 @@ async function clearAllData() {
   }
 }
 
-// ===== SHARE AS IMAGE (No external libs needed!) =====
+// ===== SHARE AS IMAGE — Captures only quotation area =====
 async function shareAsImage() {
   showToast('Creating image...');
   var content = document.getElementById('pdfContent');
   if (!content) { showToast('Nothing to share'); return; }
 
   try {
-    // Use canvas-based screenshot (built into modern mobile browsers)
-    var canvas = document.createElement('canvas');
-    var rect = content.getBoundingClientRect();
-    var scale = 2;
-    canvas.width = rect.width * scale;
-    canvas.height = rect.height * scale;
-    var ctx = canvas.getContext('2d');
-    ctx.scale(scale, scale);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, rect.width, rect.height);
-
-    // Convert HTML to SVG foreignObject then to canvas
-    var svgData = '<svg xmlns="http://www.w3.org/2000/svg" width="' + rect.width + '" height="' + rect.height + '">' +
-      '<foreignObject width="100%" height="100%">' +
-      '<div xmlns="http://www.w3.org/1999/xhtml">' +
-      content.outerHTML.replace(/&/g,'&amp;') +
-      '</div></foreignObject></svg>';
-
-    // Simpler approach: generate a formatted text-based image
+    var canvas = await renderToCanvas(content);
+    var blob = await new Promise(function(resolve) { canvas.toBlob(resolve, 'image/png'); });
     var docData = collectDocData();
-    var textContent = generateShareText(docData);
+    var fileName = (docData.type === 'quotation' ? 'Quotation' : 'Bill') + '_' + (docData.customer.name || 'doc').replace(/\s+/g, '_') + '.png';
 
-    if (navigator.share) {
-      await navigator.share({
-        title: (docData.type === 'quotation' ? 'Quotation' : 'Bill') + ' - ' + (docData.customer.name || ''),
-        text: textContent
-      });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'image/png' })] })) {
+      var file = new File([blob], fileName, { type: 'image/png' });
+      await navigator.share({ files: [file], title: fileName });
       showToast('Shared!');
     } else {
-      // Copy to clipboard
-      await navigator.clipboard.writeText(textContent);
-      showToast('Copied to clipboard!');
+      // Fallback: download the image
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Image downloaded!');
     }
   } catch(err) {
+    console.error('Share image error:', err);
     if (err.name !== 'AbortError') {
-      // Fallback: copy text
-      try {
-        var docData2 = collectDocData();
-        var text = generateShareText(docData2);
-        await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard!');
-      } catch(e) {
-        showToast('Could not share');
-      }
+      showToast('Could not create image');
     }
   }
 }
 
-function shareAsText() {
-  var data = collectDocData();
-  var text = generateShareText(data);
-  var encoded = encodeURIComponent(text);
-  window.open('https://wa.me/?text=' + encoded, '_blank');
+// Render an HTML element to canvas (no external library needed)
+function renderToCanvas(el) {
+  return new Promise(function(resolve, reject) {
+    var rect = el.getBoundingClientRect();
+    var scale = 2; // retina quality
+    var w = rect.width;
+    var h = rect.height;
+
+    // Clone element so we can style it independently
+    var clone = el.cloneNode(true);
+    clone.style.width = w + 'px';
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.background = '#ffffff';
+    document.body.appendChild(clone);
+
+    // Get computed styles from original and inline them into clone
+    inlineAllStyles(el, clone);
+
+    // Serialize to XML for foreignObject
+    var serializer = new XMLSerializer();
+    var htmlStr = serializer.serializeToString(clone);
+    document.body.removeChild(clone);
+
+    // Build SVG with foreignObject
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      htmlStr +
+      '</foreignObject></svg>';
+
+    var svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(svgBlob);
+
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = w * scale;
+      canvas.height = h * scale;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = function(e) {
+      URL.revokeObjectURL(url);
+      // Fallback: draw text-based image on canvas
+      resolve(renderTextToCanvas(collectDocData()));
+    };
+    img.src = url;
+  });
 }
 
-function generateShareText(data) {
+// Inline all computed styles into cloned elements
+function inlineAllStyles(orig, clone) {
+  var origChildren = orig.children;
+  var cloneChildren = clone.children;
+  var computed = window.getComputedStyle(orig);
+  var important = ['font-family','font-size','font-weight','color','background-color','background',
+    'border','border-radius','padding','margin','text-align','line-height','display',
+    'flex-direction','justify-content','align-items','gap','width','max-width',
+    'border-bottom','border-top','border-collapse','white-space','overflow','box-sizing',
+    'grid-template-columns','flex'];
+  for (var i = 0; i < important.length; i++) {
+    try { clone.style[important[i]] = computed[important[i]]; } catch(e) {}
+  }
+  for (var j = 0; j < origChildren.length && j < cloneChildren.length; j++) {
+    inlineAllStyles(origChildren[j], cloneChildren[j]);
+  }
+}
+
+// Fallback: render quotation as a nicely drawn canvas image
+function renderTextToCanvas(data) {
   var cur = settings.currency;
   var subtotal = data.items.reduce(function(s, it) { return s + it.total; }, 0);
   var afterDiscount = subtotal - data.discount;
@@ -1584,45 +1633,255 @@ function generateShareText(data) {
   var grand = afterDiscount + tax + data.extraCharges;
   var typeName = data.type === 'quotation' ? 'QUOTATION' : 'BILL / INVOICE';
 
+  var canvas = document.createElement('canvas');
+  var W = 700, pad = 40, y = pad;
+  canvas.width = W;
+  var ctx = canvas.getContext('2d');
+
+  // Estimate height first
+  var lineH = 22, headerH = 120, itemH = data.items.length * 30 + 60, totalH = 100, footerH = 80;
+  var H = headerH + 80 + itemH + totalH + footerH + pad * 2 + 40;
+  canvas.height = H;
+
+  // Background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Header bar
+  ctx.fillStyle = '#1a3a5c';
+  ctx.fillRect(0, 0, W, 70);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 22px -apple-system, Arial, sans-serif';
+  ctx.fillText(settings.bizName || 'QuoteMaster', pad, 35);
+  ctx.font = '13px -apple-system, Arial, sans-serif';
+  if (settings.bizPhone) ctx.fillText('Ph: ' + settings.bizPhone, pad, 55);
+
+  // Doc type
+  ctx.fillStyle = '#e8652d';
+  ctx.font = 'bold 24px -apple-system, Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(typeName, W - pad, 35);
+  ctx.fillStyle = '#666666';
+  ctx.font = '13px -apple-system, Arial, sans-serif';
+  ctx.fillText('#' + (data.number || '-'), W - pad, 55);
+  ctx.textAlign = 'left';
+
+  y = 90;
+
+  // Date
   var dateFormatted = data.date || '-';
-  try {
-    if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch(e) {}
+  try { if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch(e) {}
+  ctx.fillStyle = '#333333';
+  ctx.font = '13px -apple-system, Arial, sans-serif';
+  ctx.fillText('Date: ' + dateFormatted, pad, y);
+  y += 25;
 
-  var lines = [];
-  lines.push('═══════════════════');
-  lines.push('  ' + typeName);
-  lines.push('═══════════════════');
-  if (settings.bizName) lines.push(settings.bizName);
-  if (settings.bizPhone) lines.push('Ph: ' + settings.bizPhone);
-  if (settings.bizGST) lines.push('GST: ' + settings.bizGST);
-  lines.push('───────────────────');
-  lines.push('#' + (data.number || '-') + '  |  Date: ' + dateFormatted);
-  lines.push('');
-  lines.push('Customer: ' + (data.customer.name || '-'));
-  if (data.customer.phone) lines.push('Ph: ' + data.customer.phone);
-  lines.push('───────────────────');
-  lines.push('ITEMS:');
+  // Customer
+  ctx.fillStyle = '#1a3a5c';
+  ctx.font = 'bold 14px -apple-system, Arial, sans-serif';
+  ctx.fillText('BILL TO:', pad, y); y += 20;
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 16px -apple-system, Arial, sans-serif';
+  ctx.fillText(data.customer.name || '-', pad, y); y += 18;
+  ctx.font = '13px -apple-system, Arial, sans-serif';
+  ctx.fillStyle = '#666666';
+  if (data.customer.phone) { ctx.fillText('Ph: ' + data.customer.phone, pad, y); y += 16; }
+  if (data.customer.address) { ctx.fillText('Addr: ' + data.customer.address, pad, y); y += 16; }
+  y += 15;
 
+  // Table header
+  ctx.fillStyle = '#1a3a5c';
+  ctx.fillRect(pad, y, W - pad * 2, 28);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px -apple-system, Arial, sans-serif';
+  var cols = [pad + 8, pad + 40, pad + 340, pad + 440, pad + 540];
+  ctx.fillText('#', cols[0], y + 18);
+  ctx.fillText('Description', cols[1], y + 18);
+  ctx.fillText('Qty', cols[2], y + 18);
+  ctx.fillText('Rate', cols[3], y + 18);
+  ctx.textAlign = 'right';
+  ctx.fillText('Amount', W - pad - 8, y + 18);
+  ctx.textAlign = 'left';
+  y += 32;
+
+  // Items
+  ctx.font = '13px -apple-system, Arial, sans-serif';
   data.items.filter(function(it) { return it.desc || it.rate; }).forEach(function(it, i) {
-    lines.push((i+1) + '. ' + (it.desc || '-'));
-    lines.push('   ' + it.qty + ' x ' + cur + it.rate.toFixed(2) + ' = ' + cur + it.total.toFixed(2));
+    ctx.fillStyle = i % 2 === 0 ? '#f8fafc' : '#ffffff';
+    ctx.fillRect(pad, y - 2, W - pad * 2, 26);
+    ctx.fillStyle = '#333333';
+    ctx.fillText((i + 1) + '', cols[0], y + 15);
+    ctx.fillText((it.desc || '-').substring(0, 35), cols[1], y + 15);
+    ctx.fillText(it.qty + '', cols[2], y + 15);
+    ctx.fillText(cur + it.rate.toFixed(2), cols[3], y + 15);
+    ctx.textAlign = 'right';
+    ctx.fillText(cur + it.total.toFixed(2), W - pad - 8, y + 15);
+    ctx.textAlign = 'left';
+    y += 26;
   });
 
-  lines.push('───────────────────');
-  lines.push('Subtotal: ' + cur + subtotal.toFixed(2));
-  if (data.discount > 0) lines.push('Discount: -' + cur + data.discount.toFixed(2));
-  if (data.taxPercent > 0) lines.push('Tax (' + data.taxPercent + '%): ' + cur + tax.toFixed(2));
-  if (data.extraCharges > 0) lines.push('Extra: ' + cur + data.extraCharges.toFixed(2));
-  lines.push('═══════════════════');
-  lines.push('TOTAL: ' + cur + grand.toFixed(2));
-  lines.push('═══════════════════');
-  if (data.notes) { lines.push(''); lines.push('Notes: ' + data.notes); }
-  lines.push('');
-  lines.push(settings.thankMsg || 'Thank you for your business!');
+  y += 10;
+  // Line
+  ctx.strokeStyle = '#e2e5ea';
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  y += 15;
 
-  return lines.join('\n');
+  // Totals
+  ctx.font = '13px -apple-system, Arial, sans-serif';
+  ctx.fillStyle = '#333333';
+  ctx.textAlign = 'right';
+  ctx.fillText('Subtotal:  ' + cur + subtotal.toFixed(2), W - pad, y); y += 20;
+  if (data.discount > 0) { ctx.fillText('Discount:  -' + cur + data.discount.toFixed(2), W - pad, y); y += 20; }
+  if (data.taxPercent > 0) { ctx.fillText('Tax (' + data.taxPercent + '%):  ' + cur + tax.toFixed(2), W - pad, y); y += 20; }
+  if (data.extraCharges > 0) { ctx.fillText('Extra:  ' + cur + data.extraCharges.toFixed(2), W - pad, y); y += 20; }
+
+  // Grand total
+  y += 5;
+  ctx.strokeStyle = '#1a3a5c'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W - pad - 220, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  y += 22;
+  ctx.fillStyle = '#e8652d';
+  ctx.font = 'bold 18px -apple-system, Arial, sans-serif';
+  ctx.fillText('TOTAL:  ' + cur + grand.toFixed(2), W - pad, y);
+  ctx.textAlign = 'left';
+  y += 30;
+
+  // Footer
+  ctx.strokeStyle = '#e2e5ea'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  y += 20;
+  ctx.fillStyle = '#e8652d';
+  ctx.font = 'bold 15px -apple-system, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(settings.thankMsg || 'Thank you for your business!', W / 2, y);
+  y += 18;
+  if (settings.bizPhone) {
+    ctx.fillStyle = '#999999';
+    ctx.font = '11px -apple-system, Arial, sans-serif';
+    ctx.fillText('Contact: ' + settings.bizPhone, W / 2, y);
+  }
+  ctx.textAlign = 'left';
+
+  // Trim canvas to actual content height
+  var finalCanvas = document.createElement('canvas');
+  finalCanvas.width = W;
+  finalCanvas.height = y + 30;
+  var fctx = finalCanvas.getContext('2d');
+  fctx.drawImage(canvas, 0, 0);
+
+  return finalCanvas;
 }
+
+// ===== GENERATE PDF (No external library needed!) =====
+function generatePDF() {
+  showToast('Generating PDF...');
+  var data = collectDocData();
+  var cur = settings.currency;
+  var subtotal = data.items.reduce(function(s, it) { return s + it.total; }, 0);
+  var afterDiscount = subtotal - data.discount;
+  var tax = afterDiscount * (data.taxPercent / 100);
+  var grand = afterDiscount + tax + data.extraCharges;
+  var typeName = data.type === 'quotation' ? 'QUOTATION' : 'BILL / INVOICE';
+  var dateFormatted = data.date || '-';
+  try { if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch(e) {}
+
+  // Build PDF manually (minimal PDF 1.4 spec)
+  var items = data.items.filter(function(it) { return it.desc || it.rate; });
+  var pageH = 842, pageW = 595; // A4 points
+  var margin = 50;
+
+  // We use a simple approach: render a styled HTML page and use print-to-PDF
+  var printHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>' + typeName + ' - ' + (data.customer.name || '') + '</title>' +
+    '<style>' +
+    'body{font-family:-apple-system,Arial,sans-serif;margin:0;padding:30px 40px;color:#333;font-size:13px;line-height:1.5}' +
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a3a5c;padding-bottom:15px;margin-bottom:20px}' +
+    '.biz-name{font-size:20px;font-weight:800;color:#1a3a5c}' +
+    '.biz-detail{font-size:11px;color:#666}' +
+    '.doc-type{font-size:22px;font-weight:800;color:#e8652d;text-align:right}' +
+    '.doc-meta{font-size:11px;color:#666;text-align:right}' +
+    '.bill-to{background:#f8fafc;border-radius:6px;padding:12px;margin-bottom:15px}' +
+    '.bill-to-label{font-size:10px;color:#999;font-weight:700;margin-bottom:3px}' +
+    '.bill-to-name{font-weight:700;font-size:14px}' +
+    'table{width:100%;border-collapse:collapse;margin:15px 0;font-size:12px}' +
+    'th{background:#1a3a5c;color:white;padding:8px;text-align:left;font-size:11px}' +
+    'th:last-child,td:last-child{text-align:right}' +
+    'td{padding:7px 8px;border-bottom:1px solid #eee}' +
+    'tr:nth-child(even){background:#f8fafc}' +
+    '.totals{text-align:right;margin-top:10px}' +
+    '.total-line{font-size:13px;margin:3px 0}' +
+    '.grand-total{font-size:17px;font-weight:800;color:#e8652d;border-top:2px solid #1a3a5c;padding-top:8px;margin-top:8px}' +
+    '.footer{text-align:center;margin-top:25px;padding-top:15px;border-top:2px solid #eee}' +
+    '.thank-you{font-size:15px;font-weight:800;color:#e8652d}' +
+    '.terms{font-size:10px;color:#666;text-align:left;margin-top:12px;padding:8px;background:#f8fafc;border-radius:4px}' +
+    '.contact{font-size:10px;color:#999;margin-top:5px}' +
+    '@media print{body{padding:20px 30px}@page{margin:15mm}}' +
+    '</style></head><body>' +
+    '<div class="header"><div>' +
+    '<div class="biz-name">' + (settings.bizName || 'QuoteMaster') + '</div>' +
+    (settings.bizOwner ? '<div class="biz-detail">' + settings.bizOwner + '</div>' : '') +
+    (settings.bizPhone ? '<div class="biz-detail">Ph: ' + settings.bizPhone + '</div>' : '') +
+    (settings.bizEmail ? '<div class="biz-detail">Email: ' + settings.bizEmail + '</div>' : '') +
+    (settings.bizAddress ? '<div class="biz-detail">Addr: ' + settings.bizAddress + '</div>' : '') +
+    (settings.bizGST ? '<div class="biz-detail">GST: ' + settings.bizGST + '</div>' : '') +
+    '</div><div>' +
+    '<div class="doc-type">' + typeName + '</div>' +
+    '<div class="doc-meta">#' + (data.number || '-') + '</div>' +
+    '<div class="doc-meta">Date: ' + dateFormatted + '</div>' +
+    '</div></div>' +
+    '<div class="bill-to">' +
+    '<div class="bill-to-label">BILL TO:</div>' +
+    '<div class="bill-to-name">' + (data.customer.name || '-') + '</div>' +
+    (data.customer.phone ? '<div class="biz-detail">Ph: ' + data.customer.phone + '</div>' : '') +
+    (data.customer.address ? '<div class="biz-detail">Addr: ' + data.customer.address + '</div>' : '') +
+    '</div>' +
+    '<table><thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>';
+
+  items.forEach(function(it, i) {
+    printHTML += '<tr><td>' + (i+1) + '</td><td>' + (it.desc || '-') + '</td>' +
+      '<td style="text-align:center">' + it.qty + '</td>' +
+      '<td style="text-align:right">' + cur + it.rate.toFixed(2) + '</td>' +
+      '<td>' + cur + it.total.toFixed(2) + '</td></tr>';
+  });
+
+  printHTML += '</tbody></table>' +
+    '<div class="totals">' +
+    '<div class="total-line">Subtotal: ' + cur + subtotal.toFixed(2) + '</div>' +
+    (data.discount > 0 ? '<div class="total-line">Discount: -' + cur + data.discount.toFixed(2) + '</div>' : '') +
+    (data.taxPercent > 0 ? '<div class="total-line">Tax (' + data.taxPercent + '%): ' + cur + tax.toFixed(2) + '</div>' : '') +
+    (data.extraCharges > 0 ? '<div class="total-line">Extra: ' + cur + data.extraCharges.toFixed(2) + '</div>' : '') +
+    '<div class="grand-total">TOTAL: ' + cur + grand.toFixed(2) + '</div>' +
+    '</div>' +
+    (data.notes ? '<div class="terms"><strong>Terms & Notes:</strong><br>' + data.notes.replace(/\n/g, '<br>') + '</div>' : '') +
+    '<div class="footer">' +
+    '<div class="thank-you">' + (settings.thankMsg || 'Thank you for your business!') + '</div>' +
+    (settings.bizPhone ? '<div class="contact">Contact: ' + settings.bizPhone + '</div>' : '') +
+    '</div></body></html>';
+
+  // Open in new window and trigger print (Save as PDF on mobile)
+  var printWin = window.open('', '_blank');
+  if (printWin) {
+    printWin.document.write(printHTML);
+    printWin.document.close();
+    setTimeout(function() {
+      printWin.print();
+      showToast('Use "Save as PDF" in print dialog');
+    }, 500);
+  } else {
+    // Fallback: download as HTML
+    var blob = new Blob([printHTML], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (typeName.replace(/\s+/g, '_') + '_' + (data.customer.name || 'doc').replace(/\s+/g, '_') + '.html');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Downloaded as HTML - open & print to PDF');
+  }
+}
+
 
 // ===== EXPORT / IMPORT =====
 async function exportAllData() {
