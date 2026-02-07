@@ -1,6 +1,6 @@
 // QuoteMaster Service Worker v3
 // Auto-update: change CACHE_VERSION to force update on all clients
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = 'quotemaster-' + CACHE_VERSION;
 const ASSETS_TO_CACHE = [
   './',

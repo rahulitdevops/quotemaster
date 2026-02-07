@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
@@ -505,13 +505,268 @@ html, body {
 .screen::-webkit-scrollbar { display: none; }
 .screen { -ms-overflow-style: none; scrollbar-width: none; }
 
-@media (min-width: 481px) {
+/* ===== TABLET (481-767px) — centered but wider ===== */
+@media (min-width: 481px) and (max-width: 767px) {
   .app-container {
+    max-width: 600px;
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
     box-shadow: 0 0 40px rgba(0,0,0,0.1);
   }
+  .bottom-nav { max-width: 600px; }
 }
+
+/* ===== DESKTOP (768px+) — sidebar nav + full-width layout ===== */
+@media (min-width: 768px) {
+  html, body { overflow: auto; }
+
+  .app-container {
+    max-width: 100%;
+    flex-direction: row;
+    height: 100vh;
+    margin: 0;
+    background: var(--bg);
+  }
+
+  /* --- Sidebar Navigation --- */
+  .bottom-nav {
+    position: fixed;
+    bottom: auto;
+    left: 0;
+    top: 0;
+    width: 220px;
+    height: 100vh;
+    max-width: 220px;
+    flex-direction: column;
+    transform: none;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    padding: 0;
+    box-shadow: 2px 0 20px rgba(0,0,0,0.04);
+    background: var(--primary);
+    z-index: 200;
+    gap: 2px;
+  }
+  .bottom-nav::before {
+    content: '📋 QuoteMaster';
+    display: block;
+    padding: 22px 20px 20px;
+    font-size: 18px;
+    font-weight: 800;
+    color: white;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  .nav-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 13px 20px;
+    font-size: 14px;
+    border-radius: 0;
+    color: rgba(255,255,255,0.7);
+    gap: 12px;
+    transition: all 0.15s;
+    margin: 0 8px;
+    border-radius: 10px;
+  }
+  .nav-btn .nav-icon { font-size: 20px; }
+  .nav-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+  }
+  .nav-btn.active {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    box-shadow: none;
+  }
+
+  /* --- Top Bar hides on desktop (sidebar replaces it) --- */
+  .top-bar {
+    display: none;
+  }
+
+  /* --- Main content area shifts right --- */
+  .screen {
+    margin-left: 220px;
+    padding: 28px 36px;
+    padding-bottom: 28px;
+    max-width: 1200px;
+  }
+
+  /* --- Desktop Stats Dashboard --- */
+  .desktop-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  .stat-icon { font-size: 36px; }
+  .stat-value { font-size: 24px; font-weight: 800; color: var(--primary); }
+  .stat-label { font-size: 12px; color: var(--text-light); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* --- Home screen: dashboard layout --- */
+  #screen-home .welcome-banner {
+    padding: 30px 36px;
+    margin-bottom: 24px;
+  }
+  #screen-home .welcome-banner h2 { font-size: 28px; }
+  #screen-home .welcome-banner p { font-size: 15px; }
+  .quick-actions {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .quick-action { padding: 28px 20px; }
+  .quick-action .qa-icon { font-size: 42px; }
+  .quick-action .qa-label { font-size: 15px; }
+  .quick-action:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  .recent-header h3 { font-size: 18px; }
+  #recentList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+  .recent-item {
+    margin-bottom: 0;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .recent-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+
+  /* --- Create screen: wider form with 2-column layout --- */
+  #screen-create {
+    max-width: 900px;
+  }
+  #screen-create .card {
+    padding: 24px;
+  }
+  #screen-create .card-title {
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
+  .switch-group {
+    max-width: 360px;
+    margin-bottom: 20px;
+  }
+  .form-row { grid-template-columns: 1fr 1fr 1fr; }
+  .item-entry {
+    padding: 18px;
+  }
+  .item-entry .form-row {
+    grid-template-columns: 3fr 1fr 1fr;
+  }
+
+  /* --- Preview screen: wider & centered --- */
+  #screen-preview {
+    max-width: 800px;
+  }
+  #screen-preview .preview-frame {
+    padding: 36px;
+    font-size: 14px;
+  }
+  .preview-header { margin-bottom: 24px; padding-bottom: 18px; }
+  .preview-co-name { font-size: 22px; }
+  .preview-doc-type { font-size: 26px; }
+  .preview-table { font-size: 13px; }
+  .preview-table th { padding: 10px 8px; font-size: 12px; }
+  .preview-table td { padding: 9px 8px; }
+  .btn-row { max-width: 500px; }
+
+  /* --- Saved screen: table-like grid --- */
+  #screen-saved h3 { font-size: 20px; }
+  .search-bar { max-width: 400px; }
+  #savedList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+  #savedList .recent-item {
+    margin-bottom: 0;
+  }
+
+  /* --- Settings: wider 2-col layout --- */
+  #screen-settings {
+    max-width: 900px;
+  }
+  #screen-settings h3 { font-size: 20px; }
+  #screen-settings .card {
+    padding: 24px;
+  }
+  .logo-upload-area {
+    margin: 0 0 14px 0;
+  }
+
+  /* --- Buttons hover effect on desktop --- */
+  .btn { transition: all 0.15s; }
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary:hover { box-shadow: 0 4px 16px rgba(232,101,45,0.3); }
+  .btn-secondary:hover { box-shadow: 0 4px 16px rgba(26,58,92,0.3); }
+
+  /* --- Cards hover --- */
+  .card { transition: box-shadow 0.15s; }
+  .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+
+  /* --- Toast positioning --- */
+  .toast {
+    left: calc(220px + 50%);
+    transform: translateX(-50%) translateY(-100px);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* --- Install banner --- */
+  .install-banner { display: none !important; }
+
+  /* --- Discard modal centering --- */
+  #discardModal { padding-left: 220px; }
+}
+
+/* ===== LARGE DESKTOP (1200px+) — even more spacious ===== */
+@media (min-width: 1200px) {
+  .bottom-nav { width: 250px; max-width: 250px; }
+  .bottom-nav::before { font-size: 20px; padding: 26px 24px 22px; }
+  .nav-btn { padding: 14px 24px; font-size: 15px; margin: 0 10px; }
+
+  .screen { margin-left: 250px; padding: 36px 48px; max-width: 1400px; }
+
+  .quick-actions { gap: 20px; }
+  .quick-action { padding: 32px 24px; }
+
+  #screen-create { max-width: 1000px; }
+  #screen-preview { max-width: 900px; }
+  #screen-settings { max-width: 1000px; }
+
+  .toast { left: calc(250px + 50%); }
+  #discardModal { padding-left: 250px; }
+
+  /* Stats row on home */
+  .quick-actions { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Desktop Stats — hidden on mobile */
+.desktop-stats { display: none; }
 
 /* Search */
 .search-bar {
@@ -563,6 +818,38 @@ html, body {
     <div class="welcome-banner">
       <h2>&#128075; Namaste!</h2>
       <p>Create professional quotations & bills easily</p>
+    </div>
+
+    <!-- Desktop Stats Row -->
+    <div class="desktop-stats" id="desktopStats">
+      <div class="stat-card">
+        <div class="stat-icon">&#128203;</div>
+        <div class="stat-info">
+          <div class="stat-value" id="statQuotations">0</div>
+          <div class="stat-label">Quotations</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">&#129534;</div>
+        <div class="stat-info">
+          <div class="stat-value" id="statBills">0</div>
+          <div class="stat-label">Bills</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">&#128176;</div>
+        <div class="stat-info">
+          <div class="stat-value" id="statRevenue">&#8377;0</div>
+          <div class="stat-label">Total Revenue</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">&#128197;</div>
+        <div class="stat-info">
+          <div class="stat-value" id="statThisMonth">0</div>
+          <div class="stat-label">This Month</div>
+        </div>
+      </div>
     </div>
 
     <div class="quick-actions">
@@ -967,7 +1254,7 @@ function showScreen(name) {
     b.classList.toggle('active', b.dataset.screen === name);
   });
   if (name === 'saved') renderSavedList();
-  if (name === 'home') renderRecentList();
+  if (name === 'home') { renderRecentList(); updateDashboardStats(); }
   if (name === 'settings') populateSettings();
 }
 
@@ -1415,6 +1702,29 @@ function renderRecentList() {
       '<div class="recent-amount">' + cur + grand.toFixed(0) + '</div>' +
     '</div>';
   }).join('');
+}
+
+function updateDashboardStats() {
+  var quotations = savedDocs.filter(function(d) { return d.type === 'quotation'; }).length;
+  var bills = savedDocs.filter(function(d) { return d.type === 'bill'; }).length;
+  var totalRevenue = savedDocs.reduce(function(sum, d) { return sum + calcGrand(d); }, 0);
+  var cur = settings.currency;
+
+  // This month count
+  var now = new Date();
+  var thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  var thisMonth = savedDocs.filter(function(d) {
+    return d.date && d.date >= thisMonthStart;
+  }).length;
+
+  var qEl = document.getElementById('statQuotations');
+  var bEl = document.getElementById('statBills');
+  var rEl = document.getElementById('statRevenue');
+  var mEl = document.getElementById('statThisMonth');
+  if (qEl) qEl.textContent = quotations;
+  if (bEl) bEl.textContent = bills;
+  if (rEl) rEl.textContent = cur + (totalRevenue >= 1000 ? (totalRevenue / 1000).toFixed(1) + 'K' : totalRevenue.toFixed(0));
+  if (mEl) mEl.textContent = thisMonth;
 }
 
 function renderSavedList(filter) {
@@ -2298,7 +2608,7 @@ window.addEventListener('appinstalled', function() {
 });
 
 // ===== SERVICE WORKER REGISTRATION WITH AUTO-UPDATE =====
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v7';
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function() {
