@@ -1,0 +1,34 @@
+{
+  "name": "QuoteMaster - Bill & Quotation Generator",
+  "short_name": "QuoteMaster",
+  "description": "Simple bill and quotation generator for carpenters, plumbers & contractors. Works 100% offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a3a5c",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%231a3a5c'/%3E%3Ctext x='256' y='340' text-anchor='middle' font-size='260'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%231a3a5c'/%3E%3Ctext x='256' y='340' text-anchor='middle' font-size='260'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231a3a5c'/%3E%3Ctext x='256' y='340' text-anchor='middle' font-size='260'%3E%F0%9F%93%8B%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

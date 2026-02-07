@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a3a5c">
+<meta name="apple-mobile-web-app-title" content="QuoteMaster">
+<meta name="application-name" content="QuoteMaster">
+<meta name="description" content="Simple bill and quotation generator for carpenters, plumbers & contractors">
+<title>QuoteMaster - Bill & Quotation Generator</title>
+<!-- Inline SVG favicon so no external file needed -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a3a5c'/><text x='50' y='68' text-anchor='middle' font-size='50'>📋</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a3a5c'/><text x='50' y='68' text-anchor='middle' font-size='50'>📋</text></svg>">
+<link rel="manifest" href="manifest.json">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #1a3a5c;
+  --primary-light: #2a5a8c;
+  --accent: #e8652d;
+  --accent-light: #ff7f4f;
+  --bg: #f0f2f5;
+  --card: #ffffff;
+  --text: #1a1a2e;
+  --text-light: #6b7280;
+  --success: #10b981;
+  --danger: #ef4444;
+  --border: #e2e5ea;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== APP SHELL ===== */
+.app-container {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ===== TOP BAR ===== */
+.top-bar {
+  background: var(--primary);
+  color: white;
+  padding: calc(var(--safe-top) + 12px) 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 100;
+  flex-shrink: 0;
+}
+.top-bar h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+.top-bar .subtitle { font-size: 11px; opacity: 0.7; font-weight: 400; }
+.top-bar-btn {
+  width: 42px; height: 42px;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border-radius: 12px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.top-bar-btn:active { background: rgba(255,255,255,0.3); }
+
+/* ===== SCREENS ===== */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  padding-bottom: calc(80px + var(--safe-bottom));
+  display: none;
+  animation: fadeIn 0.25s ease;
+}
+.screen.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  display: flex;
+  padding: 6px 8px calc(var(--safe-bottom) + 6px);
+  border-top: 1px solid var(--border);
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+}
+.nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  color: var(--text-light);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+.nav-btn .nav-icon { font-size: 22px; line-height: 1; }
+.nav-btn.active {
+  color: var(--accent);
+  background: rgba(232, 101, 45, 0.08);
+}
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title .icon { font-size: 20px; }
+
+/* ===== FORM ELEMENTS ===== */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: white;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.form-input::placeholder { color: #b0b5bf; }
+.form-textarea { resize: vertical; min-height: 70px; }
+.form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:active { background: var(--accent-light); }
+.btn-secondary { background: var(--primary); color: white; }
+.btn-outline { background: white; color: var(--primary); border: 2px solid var(--primary); }
+.btn-success { background: var(--success); color: white; }
+.btn-danger { background: white; color: var(--danger); border: 2px solid #fecaca; }
+.btn-sm { padding: 10px 16px; font-size: 13px; border-radius: 10px; }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+
+/* ===== HOME SCREEN ===== */
+.welcome-banner {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.welcome-banner::after {
+  content: '';
+  position: absolute;
+  right: -20px; top: -20px;
+  width: 100px; height: 100px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 50%;
+}
+.welcome-banner h2 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.welcome-banner p { font-size: 13px; opacity: 0.8; }
+
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.quick-action {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  text-align: center;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--shadow);
+}
+.quick-action:active { border-color: var(--accent); transform: scale(0.97); }
+.quick-action .qa-icon { font-size: 36px; margin-bottom: 8px; display: block; }
+.quick-action .qa-label { font-size: 14px; font-weight: 700; color: var(--text); }
+.quick-action .qa-desc { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
+.recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.recent-header h3 { font-size: 16px; font-weight: 700; }
+.recent-item {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.recent-item:active { background: #f8f9fa; }
+.recent-info .ri-name { font-weight: 700; font-size: 14px; }
+.recent-info .ri-date { font-size: 12px; color: var(--text-light); }
+.recent-amount { font-weight: 800; font-size: 15px; color: var(--accent); }
+
+/* ===== ITEM ROW ===== */
+.item-entry {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  position: relative;
+}
+.item-entry .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.item-num {
+  background: var(--primary);
+  color: white;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+.item-remove {
+  width: 32px; height: 32px;
+  border: none;
+  background: #fee2e2;
+  color: var(--danger);
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.item-total-label { font-size: 12px; color: var(--text-light); font-weight: 600; }
+.item-total-val { font-weight: 800; color: var(--accent); font-size: 15px; }
+
+/* ===== TOTALS ===== */
+.totals-card {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-top: 6px;
+}
+.total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+.total-row.grand {
+  border-top: 2px solid rgba(255,255,255,0.3);
+  margin-top: 6px;
+  padding-top: 10px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* ===== PREVIEW ===== */
+.preview-frame {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 3px solid var(--primary);
+}
+.preview-logo {
+  width: 60px; height: 60px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #f0f2f5;
+}
+.preview-co-name { font-size: 16px; font-weight: 800; color: var(--primary); }
+.preview-co-detail { font-size: 11px; color: var(--text-light); }
+.preview-doc-type { font-size: 20px; font-weight: 800; color: var(--accent); text-align: right; }
+.preview-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 11px; }
+.preview-table th {
+  background: var(--primary);
+  color: white;
+  padding: 8px 6px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 10px;
+}
+.preview-table th:last-child, .preview-table td:last-child { text-align: right; }
+.preview-table td { padding: 7px 6px; border-bottom: 1px solid var(--border); }
+.preview-totals { display: flex; flex-direction: column; align-items: flex-end; margin-top: 10px; gap: 3px; }
+.preview-total-row { display: flex; gap: 20px; font-size: 12px; }
+.preview-total-row.grand {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+  border-top: 2px solid var(--primary);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+.preview-footer { margin-top: 16px; padding-top: 12px; border-top: 2px solid var(--border); text-align: center; }
+.preview-terms {
+  font-size: 10px;
+  color: var(--text-light);
+  text-align: left;
+  margin-top: 10px;
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+.preview-thankyou { font-size: 14px; font-weight: 800; color: var(--accent); margin-top: 8px; }
+
+/* ===== SETTINGS ===== */
+.logo-upload-area {
+  width: 90px; height: 90px;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  background: #f8fafc;
+  transition: border-color 0.2s;
+  margin: 0 auto 14px;
+}
+.logo-upload-area:active { border-color: var(--accent); }
+.logo-upload-area img { width: 100%; height: 100%; object-fit: contain; }
+.logo-upload-area .upload-icon { font-size: 28px; opacity: 0.4; }
+.logo-upload-area .upload-text { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+
+/* ===== SAVED DOCS ===== */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 10px; display: block; }
+.empty-state .empty-text { font-size: 14px; font-weight: 600; }
+
+/* ===== MISC ===== */
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.badge-quote { background: #dbeafe; color: #1d4ed8; }
+.badge-bill { background: #d1fae5; color: #065f46; }
+
+.switch-group { display: flex; background: #f0f2f5; border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+.switch-opt {
+  flex: 1; padding: 10px; text-align: center; border: none; background: none;
+  font-family: inherit; font-size: 14px; font-weight: 700; border-radius: 8px;
+  cursor: pointer; color: var(--text-light); transition: all 0.2s;
+}
+.switch-opt.active {
+  background: var(--accent); color: white;
+  box-shadow: 0 2px 8px rgba(232,101,45,0.3);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: var(--text);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 9999;
+  transition: transform 0.3s ease;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Currency prefix */
+.input-with-prefix { position: relative; }
+.input-with-prefix .prefix {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%); font-weight: 700;
+  color: var(--text-light); font-size: 15px;
+}
+.input-with-prefix .form-input { padding-left: 32px; }
+
+/* Install banner */
+.install-banner {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+  color: white;
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.install-banner.show { display: flex; }
+.install-banner .ib-icon { font-size: 28px; }
+.install-banner .ib-text { flex: 1; }
+.install-banner .ib-title { font-weight: 800; font-size: 14px; }
+.install-banner .ib-desc { font-size: 11px; opacity: 0.9; }
+.install-banner .ib-close {
+  width: 28px; height: 28px; border: none; background: rgba(255,255,255,0.2);
+  border-radius: 50%; color: white; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* DB status indicator */
+.db-status {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.db-status.ready { color: rgba(16,185,129,0.8); }
+
+/* No scrollbar but still scrollable */
+.screen::-webkit-scrollbar { display: none; }
+.screen { -ms-overflow-style: none; scrollbar-width: none; }
+
+@media (min-width: 481px) {
+  .app-container {
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 40px rgba(0,0,0,0.1);
+  }
+}
+
+/* Search */
+.search-bar {
+  position: relative;
+  margin-bottom: 14px;
+}
+.search-bar input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  background: white;
+  color: var(--text);
+}
+.search-bar input:focus { outline: none; border-color: var(--accent); }
+.search-bar .search-icon {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%); font-size: 16px; opacity: 0.4;
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div>
+      <h1 id="appTitle">QuoteMaster</h1>
+      <div class="subtitle" id="appSubtitle">Bill & Quotation Generator</div>
+      <div class="db-status" id="dbStatus">Connecting...</div>
+    </div>
+    <button class="top-bar-btn" onclick="showScreen('settings')" title="Settings">&#9881;&#65039;</button>
+  </div>
+
+  <!-- ===== HOME SCREEN ===== -->
+  <div class="screen active" id="screen-home">
+    <!-- Install PWA Banner -->
+    <div class="install-banner" id="installBanner" onclick="installPWA()">
+      <span class="ib-icon">&#128242;</span>
+      <div class="ib-text">
+        <div class="ib-title">Install QuoteMaster</div>
+        <div class="ib-desc">Add to home screen for offline use</div>
+      </div>
+      <button class="ib-close" onclick="event.stopPropagation();dismissInstall()">&#10005;</button>
+    </div>
+
+    <div class="welcome-banner">
+      <h2>&#128075; Namaste!</h2>
+      <p>Create professional quotations & bills easily</p>
+    </div>
+
+    <div class="quick-actions">
+      <div class="quick-action" onclick="startNew('quotation')">
+        <span class="qa-icon">&#128203;</span>
+        <span class="qa-label">New Quotation</span>
+        <span class="qa-desc">Price estimate</span>
+      </div>
+      <div class="quick-action" onclick="startNew('bill')">
+        <span class="qa-icon">&#129534;</span>
+        <span class="qa-label">New Bill</span>
+        <span class="qa-desc">Invoice / Receipt</span>
+      </div>
+    </div>
+
+    <div class="recent-header">
+      <h3>&#128196; Recent</h3>
+    </div>
+    <div id="recentList">
+      <div class="empty-state">
+        <span class="empty-icon">&#128237;</span>
+        <span class="empty-text">No documents yet. Create your first one!</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CREATE SCREEN ===== -->
+  <div class="screen" id="screen-create">
+    <div class="switch-group">
+      <button class="switch-opt active" onclick="setDocType('quotation', this)">&#128203; Quotation</button>
+      <button class="switch-opt" onclick="setDocType('bill', this)">&#129534; Bill</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128100;</span> Customer Details</div>
+      <div class="form-group">
+        <label class="form-label">Customer Name *</label>
+        <input type="text" class="form-input" id="custName" placeholder="e.g. Ramesh Kumar">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" id="custPhone" placeholder="e.g. 9876543210">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address</label>
+        <textarea class="form-textarea" id="custAddress" placeholder="Full address..." rows="2"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-input" id="docDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Doc Number</label>
+          <input type="text" class="form-input" id="docNumber" placeholder="Auto">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128230;</span> Work / Items</div>
+      <div id="itemsList"></div>
+      <button class="btn btn-outline btn-sm" onclick="addItem()" style="margin-top:4px">
+        &#10133; Add Item
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#129518;</span> Summary</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Discount</label>
+          <div class="input-with-prefix">
+            <span class="prefix" id="discPrefix">&#8377;</span>
+            <input type="number" class="form-input" id="discountAmt" value="0" oninput="calcTotals()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tax / GST (%)</label>
+          <input type="number" class="form-input" id="taxPercent" value="0" placeholder="0" oninput="calcTotals()">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Extra Charges</label>
+        <div class="input-with-prefix">
+          <span class="prefix" id="extraPrefix">&#8377;</span>
+          <input type="number" class="form-input" id="extraCharges" value="0" oninput="calcTotals()">
+        </div>
+      </div>
+
+      <div class="totals-card" id="totalsCard">
+        <div class="total-row"><span>Subtotal</span><span id="dispSubtotal">&#8377;0.00</span></div>
+        <div class="total-row"><span>Discount</span><span id="dispDiscount">-&#8377;0.00</span></div>
+        <div class="total-row"><span>Tax / GST</span><span id="dispTax">&#8377;0.00</span></div>
+        <div class="total-row"><span>Extra Charges</span><span id="dispExtra">&#8377;0.00</span></div>
+        <div class="total-row grand"><span>TOTAL</span><span id="dispGrand">&#8377;0.00</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128221;</span> Notes / Terms</div>
+      <div class="form-group">
+        <textarea class="form-textarea" id="docNotes" placeholder="Any terms, warranty info, payment details..." rows="3"></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="previewDoc()">&#128065; Preview</button>
+      <button class="btn btn-primary" onclick="saveAndPreview()">&#128190; Save</button>
+    </div>
+  </div>
+
+  <!-- ===== PREVIEW SCREEN ===== -->
+  <div class="screen" id="screen-preview">
+    <div id="previewContent"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-outline" onclick="showScreen('create')">&#9999;&#65039; Edit</button>
+      <button class="btn btn-primary" onclick="shareAsImage()">&#128247; Share as Image</button>
+    </div>
+    <button class="btn btn-success" onclick="shareAsText()" style="margin-top:10px">&#128228; Share via WhatsApp</button>
+  </div>
+
+  <!-- ===== SAVED SCREEN ===== -->
+  <div class="screen" id="screen-saved">
+    <h3 style="font-size:18px;font-weight:800;margin-bottom:14px">&#128194; Saved Documents</h3>
+    <div class="search-bar">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" placeholder="Search by customer name..." id="searchInput" oninput="filterSaved()">
+    </div>
+    <div id="savedList">
+      <div class="empty-state">
+        <span class="empty-icon">&#128237;</span>
+        <span class="empty-text">No saved documents</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS SCREEN ===== -->
+  <div class="screen" id="screen-settings">
+    <h3 style="font-size:18px;font-weight:800;margin-bottom:14px">&#9881;&#65039; Business Settings</h3>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127970;</span> Your Business Info</div>
+      <div style="text-align:center">
+        <label class="form-label" style="text-align:center">Business Logo</label>
+        <div class="logo-upload-area" id="logoUploadArea" onclick="document.getElementById('logoInput').click()">
+          <span class="upload-icon">&#128247;</span>
+          <span class="upload-text">Tap to upload</span>
+        </div>
+        <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogo(event)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Business / Firm Name *</label>
+        <input type="text" class="form-input" id="bizName" placeholder="e.g. Sharma Carpenter Works">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Owner Name</label>
+        <input type="text" class="form-input" id="bizOwner" placeholder="e.g. Rajesh Sharma">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input type="tel" class="form-input" id="bizPhone" placeholder="e.g. 9876543210">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email (Optional)</label>
+        <input type="email" class="form-input" id="bizEmail" placeholder="e.g. sharma@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Address</label>
+        <textarea class="form-textarea" id="bizAddress" placeholder="Full business address..." rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">GST Number (Optional)</label>
+        <input type="text" class="form-input" id="bizGST" placeholder="e.g. 22AAAAA0000A1Z5">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127912;</span> Preferences</div>
+      <div class="form-group">
+        <label class="form-label">Currency Symbol</label>
+        <select class="form-select" id="currencySymbol">
+          <option value="&#8377;">&#8377; - Indian Rupee</option>
+          <option value="$">$ - US Dollar</option>
+          <option value="&#8364;">&#8364; - Euro</option>
+          <option value="&#163;">&#163; - Pound</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Default Thank You Message</label>
+        <input type="text" class="form-input" id="thankMsg" placeholder="Thank you for your business!">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Default Terms & Conditions</label>
+        <textarea class="form-textarea" id="defaultTerms" placeholder="e.g. 50% advance payment required. Warranty: 1 year." rows="3"></textarea>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveSettings()">&#128190; Save Settings</button>
+
+    <div class="card" style="margin-top:14px">
+      <div class="card-title"><span class="icon">&#128230;</span> Data Management</div>
+      <button class="btn btn-outline btn-sm" onclick="exportAllData()" style="margin-bottom:8px">&#128228; Export All Data (JSON)</button>
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('importInput').click()" style="margin-bottom:8px">&#128229; Import Data</button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+      <button class="btn btn-danger btn-sm" onclick="clearAllData()">&#128465; Clear All Data</button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" onclick="showScreen('home')" data-screen="home">
+      <span class="nav-icon">&#127968;</span>
+      Home
+    </button>
+    <button class="nav-btn" onclick="showScreen('create')" data-screen="create">
+      <span class="nav-icon">&#10133;</span>
+      Create
+    </button>
+    <button class="nav-btn" onclick="showScreen('saved')" data-screen="saved">
+      <span class="nav-icon">&#128194;</span>
+      Saved
+    </button>
+    <button class="nav-btn" onclick="showScreen('settings')" data-screen="settings">
+      <span class="nav-icon">&#9881;&#65039;</span>
+      Settings
+    </button>
+  </nav>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// =====================================================================
+// IndexedDB - Local Mobile Database (works offline, no server needed)
+// =====================================================================
+const DB_NAME = 'QuoteMasterDB';
+const DB_VERSION = 2;
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+    request.onupgradeneeded = (event) => {
+      const d = event.target.result;
+      // Documents store
+      if (!d.objectStoreNames.contains('documents')) {
+        const docStore = d.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+        docStore.createIndex('type', 'type', { unique: false });
+        docStore.createIndex('customerName', 'customer.name', { unique: false });
+        docStore.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      // Settings store
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+// Generic IDB helpers
+function idbPut(storeName, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.put(data);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGet(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGetAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbDelete(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbClear(storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ===== STATE =====
+let currentDoc = {
+  type: 'quotation', customer: {}, items: [],
+  discount: 0, taxPercent: 0, extraCharges: 0,
+  notes: '', date: '', number: ''
+};
+
+let settings = {
+  bizName: '', bizOwner: '', bizPhone: '', bizEmail: '',
+  bizAddress: '', bizGST: '', logoData: '', currency: '\u20B9',
+  thankMsg: 'Thank you for your business!', defaultTerms: ''
+};
+
+let savedDocs = [];
+let editingId = null;
+let deferredPrompt = null;
+
+// ===== INIT =====
+async function init() {
+  try {
+    await openDB();
+    document.getElementById('dbStatus').textContent = 'Database ready';
+    document.getElementById('dbStatus').classList.add('ready');
+
+    // Migrate from localStorage if exists
+    await migrateFromLocalStorage();
+
+    await loadSettings();
+    await loadSavedDocs();
+    setTodayDate();
+    addItem();
+    renderRecentList();
+    renderSavedList();
+    applySettings();
+  } catch (err) {
+    console.error('DB init error:', err);
+    document.getElementById('dbStatus').textContent = 'Using fallback storage';
+    // Fallback to localStorage
+    loadSettingsLS();
+    loadSavedDocsLS();
+    setTodayDate();
+    addItem();
+    renderRecentList();
+    renderSavedList();
+    applySettings();
+  }
+}
+
+async function migrateFromLocalStorage() {
+  // One-time migration from localStorage to IndexedDB
+  const lsDocs = localStorage.getItem('qm_docs');
+  const lsSettings = localStorage.getItem('qm_settings');
+  const migrated = localStorage.getItem('qm_migrated');
+
+  if (migrated) return;
+
+  if (lsSettings) {
+    try {
+      const s = JSON.parse(lsSettings);
+      await idbPut('settings', { key: 'main', ...s });
+    } catch(e) {}
+  }
+
+  if (lsDocs) {
+    try {
+      const docs = JSON.parse(lsDocs);
+      for (const doc of docs) {
+        await idbPut('documents', { ...doc, createdAt: doc.createdAt || new Date().toISOString() });
+      }
+    } catch(e) {}
+  }
+
+  localStorage.setItem('qm_migrated', '1');
+}
+
+function setTodayDate() {
+  document.getElementById('docDate').value = new Date().toISOString().split('T')[0];
+}
+
+// ===== NAVIGATION =====
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.screen === name);
+  });
+  if (name === 'saved') renderSavedList();
+  if (name === 'home') renderRecentList();
+  if (name === 'settings') populateSettings();
+}
+
+// ===== DOC TYPE =====
+function setDocType(type, btn) {
+  currentDoc.type = type;
+  document.querySelectorAll('.switch-opt').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function startNew(type) {
+  editingId = null;
+  currentDoc = { type, customer: {}, items: [], discount: 0, taxPercent: 0, extraCharges: 0, notes: '', date: '', number: '' };
+  showScreen('create');
+
+  document.getElementById('custName').value = '';
+  document.getElementById('custPhone').value = '';
+  document.getElementById('custAddress').value = '';
+  document.getElementById('discountAmt').value = '0';
+  document.getElementById('taxPercent').value = '0';
+  document.getElementById('extraCharges').value = '0';
+  document.getElementById('docNotes').value = settings.defaultTerms || '';
+  document.getElementById('docNumber').value = generateDocNumber(type);
+  setTodayDate();
+
+  document.getElementById('itemsList').innerHTML = '';
+  addItem();
+  calcTotals();
+
+  const btns = document.querySelectorAll('.switch-opt');
+  btns.forEach(b => b.classList.remove('active'));
+  btns[type === 'quotation' ? 0 : 1].classList.add('active');
+}
+
+function generateDocNumber(type) {
+  const prefix = type === 'quotation' ? 'QT' : 'BL';
+  const count = savedDocs.filter(d => d.type === type).length + 1;
+  return prefix + '-' + String(count).padStart(4, '0');
+}
+
+// ===== ITEMS =====
+let itemCounter = 0;
+function addItem() {
+  itemCounter++;
+  const id = itemCounter;
+  const div = document.createElement('div');
+  div.className = 'item-entry';
+  div.id = 'item-' + id;
+  div.innerHTML =
+    '<div class="item-header">' +
+      '<span class="item-num">' + (document.querySelectorAll('.item-entry').length + 1) + '</span>' +
+      '<button class="item-remove" onclick="removeItem(' + id + ')">&#10005;</button>' +
+    '</div>' +
+    '<div class="form-group">' +
+      '<input type="text" class="form-input" placeholder="Work / Item description" oninput="calcTotals()" data-field="desc">' +
+    '</div>' +
+    '<div class="form-row">' +
+      '<div class="form-group">' +
+        '<label class="form-label" style="font-size:11px">Qty</label>' +
+        '<input type="number" class="form-input" value="1" min="0" step="any" oninput="calcTotals()" data-field="qty">' +
+      '</div>' +
+      '<div class="form-group">' +
+        '<label class="form-label" style="font-size:11px">Rate (' + settings.currency + ')</label>' +
+        '<input type="number" class="form-input" placeholder="0" min="0" step="any" oninput="calcTotals()" data-field="rate">' +
+      '</div>' +
+    '</div>' +
+    '<div class="item-total-row">' +
+      '<span class="item-total-label">Item Total</span>' +
+      '<span class="item-total-val" data-field="itemtotal">' + settings.currency + '0.00</span>' +
+    '</div>';
+  document.getElementById('itemsList').appendChild(div);
+  renumberItems();
+}
+
+function removeItem(id) {
+  const el = document.getElementById('item-' + id);
+  if (el) el.remove();
+  renumberItems();
+  calcTotals();
+}
+
+function renumberItems() {
+  document.querySelectorAll('.item-entry').forEach(function(item, i) {
+    item.querySelector('.item-num').textContent = i + 1;
+  });
+}
+
+function getItems() {
+  var items = [];
+  document.querySelectorAll('.item-entry').forEach(function(entry) {
+    var desc = entry.querySelector('[data-field="desc"]').value;
+    var qty = parseFloat(entry.querySelector('[data-field="qty"]').value) || 0;
+    var rate = parseFloat(entry.querySelector('[data-field="rate"]').value) || 0;
+    items.push({ desc: desc, qty: qty, rate: rate, total: qty * rate });
+  });
+  return items;
+}
+
+function calcTotals() {
+  var items = getItems();
+  var cur = settings.currency;
+
+  document.querySelectorAll('.item-entry').forEach(function(entry, i) {
+    var totalEl = entry.querySelector('[data-field="itemtotal"]');
+    if (totalEl && items[i]) {
+      totalEl.textContent = cur + items[i].total.toFixed(2);
+    }
+  });
+
+  var subtotal = items.reduce(function(s, it) { return s + it.total; }, 0);
+  var discount = parseFloat(document.getElementById('discountAmt').value) || 0;
+  var taxPct = parseFloat(document.getElementById('taxPercent').value) || 0;
+  var extra = parseFloat(document.getElementById('extraCharges').value) || 0;
+  var afterDiscount = subtotal - discount;
+  var tax = afterDiscount * (taxPct / 100);
+  var grand = afterDiscount + tax + extra;
+
+  document.getElementById('dispSubtotal').textContent = cur + subtotal.toFixed(2);
+  document.getElementById('dispDiscount').textContent = '-' + cur + discount.toFixed(2);
+  document.getElementById('dispTax').textContent = cur + tax.toFixed(2);
+  document.getElementById('dispExtra').textContent = cur + extra.toFixed(2);
+  document.getElementById('dispGrand').textContent = cur + grand.toFixed(2);
+}
+
+// ===== COLLECT DATA =====
+function collectDocData() {
+  return {
+    type: currentDoc.type,
+    customer: {
+      name: document.getElementById('custName').value,
+      phone: document.getElementById('custPhone').value,
+      address: document.getElementById('custAddress').value
+    },
+    items: getItems(),
+    discount: parseFloat(document.getElementById('discountAmt').value) || 0,
+    taxPercent: parseFloat(document.getElementById('taxPercent').value) || 0,
+    extraCharges: parseFloat(document.getElementById('extraCharges').value) || 0,
+    notes: document.getElementById('docNotes').value,
+    date: document.getElementById('docDate').value,
+    number: document.getElementById('docNumber').value,
+    createdAt: new Date().toISOString()
+  };
+}
+
+// ===== PREVIEW =====
+function previewDoc() {
+  var data = collectDocData();
+  renderPreview(data);
+  showScreen('preview');
+}
+
+function renderPreview(data) {
+  var cur = settings.currency;
+  var subtotal = data.items.reduce(function(s, it) { return s + it.total; }, 0);
+  var afterDiscount = subtotal - data.discount;
+  var tax = afterDiscount * (data.taxPercent / 100);
+  var grand = afterDiscount + tax + data.extraCharges;
+  var typeName = data.type === 'quotation' ? 'QUOTATION' : 'BILL / INVOICE';
+
+  var logoHtml = '';
+  if (settings.logoData) {
+    logoHtml = '<img src="' + settings.logoData + '" class="preview-logo" alt="Logo">';
+  }
+
+  var itemsHtml = data.items.filter(function(it) { return it.desc || it.rate; }).map(function(it, i) {
+    return '<tr><td>' + (i + 1) + '</td><td>' + (it.desc || '-') + '</td>' +
+      '<td style="text-align:center">' + it.qty + '</td>' +
+      '<td style="text-align:right">' + cur + it.rate.toFixed(2) + '</td>' +
+      '<td style="text-align:right">' + cur + it.total.toFixed(2) + '</td></tr>';
+  }).join('');
+
+  var dateFormatted = '-';
+  if (data.date) {
+    try {
+      dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch(e) { dateFormatted = data.date; }
+  }
+
+  document.getElementById('previewContent').innerHTML =
+    '<div class="preview-frame" id="pdfContent">' +
+      '<div class="preview-header">' +
+        '<div style="flex:1">' +
+          logoHtml +
+          '<div class="preview-co-name">' + (settings.bizName || 'Your Business') + '</div>' +
+          (settings.bizOwner ? '<div class="preview-co-detail">' + settings.bizOwner + '</div>' : '') +
+          (settings.bizPhone ? '<div class="preview-co-detail">Ph: ' + settings.bizPhone + '</div>' : '') +
+          (settings.bizEmail ? '<div class="preview-co-detail">Email: ' + settings.bizEmail + '</div>' : '') +
+          (settings.bizAddress ? '<div class="preview-co-detail">Addr: ' + settings.bizAddress + '</div>' : '') +
+          (settings.bizGST ? '<div class="preview-co-detail">GST: ' + settings.bizGST + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div class="preview-doc-type">' + typeName + '</div>' +
+          '<div class="preview-co-detail"><strong>#' + (data.number || '-') + '</strong></div>' +
+          '<div class="preview-co-detail">Date: ' + dateFormatted + '</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="background:#f8fafc;border-radius:8px;padding:10px;margin-bottom:12px;">' +
+        '<div style="font-size:10px;color:var(--text-light);font-weight:700;margin-bottom:4px">BILL TO:</div>' +
+        '<div style="font-weight:700;font-size:13px">' + (data.customer.name || '-') + '</div>' +
+        (data.customer.phone ? '<div style="font-size:11px;color:var(--text-light)">Ph: ' + data.customer.phone + '</div>' : '') +
+        (data.customer.address ? '<div style="font-size:11px;color:var(--text-light)">Addr: ' + data.customer.address + '</div>' : '') +
+      '</div>' +
+
+      '<table class="preview-table">' +
+        '<thead><tr><th>#</th><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>' +
+        '<tbody>' + itemsHtml + '</tbody>' +
+      '</table>' +
+
+      '<div class="preview-totals">' +
+        '<div class="preview-total-row"><span>Subtotal:</span><span>' + cur + subtotal.toFixed(2) + '</span></div>' +
+        (data.discount > 0 ? '<div class="preview-total-row"><span>Discount:</span><span>-' + cur + data.discount.toFixed(2) + '</span></div>' : '') +
+        (data.taxPercent > 0 ? '<div class="preview-total-row"><span>Tax (' + data.taxPercent + '%):</span><span>' + cur + tax.toFixed(2) + '</span></div>' : '') +
+        (data.extraCharges > 0 ? '<div class="preview-total-row"><span>Extra:</span><span>' + cur + data.extraCharges.toFixed(2) + '</span></div>' : '') +
+        '<div class="preview-total-row grand"><span>TOTAL:&nbsp;&nbsp;</span><span>' + cur + grand.toFixed(2) + '</span></div>' +
+      '</div>' +
+
+      (data.notes ? '<div class="preview-terms"><strong>Terms & Notes:</strong><br>' + data.notes.replace(/\n/g, '<br>') + '</div>' : '') +
+
+      '<div class="preview-footer">' +
+        '<div class="preview-thankyou">' + (settings.thankMsg || 'Thank you for your business!') + '</div>' +
+        (settings.bizPhone ? '<div style="font-size:10px;color:var(--text-light);margin-top:4px">Contact: ' + settings.bizPhone + '</div>' : '') +
+      '</div>' +
+    '</div>';
+}
+
+// ===== SAVE =====
+async function saveAndPreview() {
+  var data = collectDocData();
+  if (!data.customer.name) {
+    showToast('Please enter customer name');
+    return;
+  }
+  if (!data.items.some(function(it) { return it.desc && it.rate; })) {
+    showToast('Please add at least one item');
+    return;
+  }
+
+  try {
+    if (db) {
+      if (editingId !== null) {
+        data.id = editingId;
+      }
+      var newId = await idbPut('documents', data);
+      if (editingId === null) editingId = newId;
+      await loadSavedDocs();
+    } else {
+      // Fallback
+      if (editingId !== null) {
+        var idx = savedDocs.findIndex(function(d) { return d.id === editingId; });
+        if (idx >= 0) { data.id = editingId; savedDocs[idx] = data; }
+        else { savedDocs.push(data); }
+      } else {
+        data.id = Date.now();
+        editingId = data.id;
+        savedDocs.push(data);
+      }
+      localStorage.setItem('qm_docs', JSON.stringify(savedDocs));
+    }
+    showToast('Saved successfully!');
+    previewDoc();
+  } catch (err) {
+    console.error('Save error:', err);
+    showToast('Error saving document');
+  }
+}
+
+async function loadDoc(id) {
+  var data = savedDocs.find(function(d) { return d.id === id; });
+  if (!data) return;
+  editingId = id;
+  currentDoc.type = data.type;
+
+  document.getElementById('custName').value = data.customer.name || '';
+  document.getElementById('custPhone').value = data.customer.phone || '';
+  document.getElementById('custAddress').value = data.customer.address || '';
+  document.getElementById('docDate').value = data.date || '';
+  document.getElementById('docNumber').value = data.number || '';
+  document.getElementById('discountAmt').value = data.discount || 0;
+  document.getElementById('taxPercent').value = data.taxPercent || 0;
+  document.getElementById('extraCharges').value = data.extraCharges || 0;
+  document.getElementById('docNotes').value = data.notes || '';
+
+  var btns = document.querySelectorAll('.switch-opt');
+  btns.forEach(function(b) { b.classList.remove('active'); });
+  btns[data.type === 'quotation' ? 0 : 1].classList.add('active');
+
+  document.getElementById('itemsList').innerHTML = '';
+  itemCounter = 0;
+  if (data.items && data.items.length) {
+    data.items.forEach(function(it) {
+      addItem();
+      var entries = document.querySelectorAll('.item-entry');
+      var last = entries[entries.length - 1];
+      last.querySelector('[data-field="desc"]').value = it.desc || '';
+      last.querySelector('[data-field="qty"]').value = it.qty || 1;
+      last.querySelector('[data-field="rate"]').value = it.rate || 0;
+    });
+  } else {
+    addItem();
+  }
+
+  calcTotals();
+  showScreen('create');
+}
+
+async function deleteDoc(id) {
+  if (!confirm('Delete this document?')) return;
+  try {
+    if (db) {
+      await idbDelete('documents', id);
+      await loadSavedDocs();
+    } else {
+      savedDocs = savedDocs.filter(function(d) { return d.id !== id; });
+      localStorage.setItem('qm_docs', JSON.stringify(savedDocs));
+    }
+    renderSavedList();
+    renderRecentList();
+    showToast('Deleted');
+  } catch(e) {
+    console.error('Delete error:', e);
+  }
+}
+
+// ===== LISTS =====
+function renderRecentList() {
+  var el = document.getElementById('recentList');
+  var recent = savedDocs.slice(-5).reverse();
+  if (!recent.length) {
+    el.innerHTML = '<div class="empty-state"><span class="empty-icon">&#128237;</span><span class="empty-text">No documents yet</span></div>';
+    return;
+  }
+  var cur = settings.currency;
+  el.innerHTML = recent.map(function(doc) {
+    var grand = calcGrand(doc);
+    var dateStr = '';
+    if (doc.date) {
+      try { dateStr = new Date(doc.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }); }
+      catch(e) { dateStr = doc.date; }
+    }
+    return '<div class="recent-item" onclick="loadDoc(' + doc.id + ')">' +
+      '<div class="recent-info">' +
+        '<div class="ri-name">' + (doc.customer.name || 'No name') +
+          ' <span class="badge ' + (doc.type === 'quotation' ? 'badge-quote' : 'badge-bill') + '">' +
+          (doc.type === 'quotation' ? 'Quote' : 'Bill') + '</span></div>' +
+        '<div class="ri-date">#' + (doc.number || '-') + ' &middot; ' + dateStr + '</div>' +
+      '</div>' +
+      '<div class="recent-amount">' + cur + grand.toFixed(0) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderSavedList(filter) {
+  var el = document.getElementById('savedList');
+  var docs = savedDocs.slice().reverse();
+  if (filter) {
+    var lf = filter.toLowerCase();
+    docs = docs.filter(function(d) {
+      return (d.customer.name || '').toLowerCase().indexOf(lf) >= 0 ||
+             (d.number || '').toLowerCase().indexOf(lf) >= 0;
+    });
+  }
+  if (!docs.length) {
+    el.innerHTML = '<div class="empty-state"><span class="empty-icon">&#128237;</span><span class="empty-text">' +
+      (filter ? 'No results for "' + filter + '"' : 'No saved documents') + '</span></div>';
+    return;
+  }
+  var cur = settings.currency;
+  el.innerHTML = docs.map(function(doc) {
+    var grand = calcGrand(doc);
+    var dateStr = '';
+    if (doc.date) {
+      try { dateStr = new Date(doc.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+      catch(e) { dateStr = doc.date; }
+    }
+    return '<div class="card" style="padding:14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div>' +
+          '<div style="font-weight:700;font-size:14px">' + (doc.customer.name || 'No name') +
+            ' <span class="badge ' + (doc.type === 'quotation' ? 'badge-quote' : 'badge-bill') + '">' +
+            (doc.type === 'quotation' ? 'Quote' : 'Bill') + '</span></div>' +
+          '<div style="font-size:12px;color:var(--text-light)">#' + (doc.number || '-') + ' &middot; ' + dateStr + '</div>' +
+        '</div>' +
+        '<div style="font-weight:800;color:var(--accent);font-size:16px">' + cur + grand.toFixed(0) + '</div>' +
+      '</div>' +
+      '<div class="btn-row" style="margin-top:10px">' +
+        '<button class="btn btn-outline btn-sm" onclick="loadDoc(' + doc.id + ')">&#9999; Edit</button>' +
+        '<button class="btn btn-sm" style="background:#dbeafe;color:#1d4ed8" onclick="viewSaved(' + doc.id + ')">&#128065; View</button>' +
+      '</div>' +
+      '<button class="btn btn-danger btn-sm" onclick="deleteDoc(' + doc.id + ')" style="margin-top:6px;font-size:12px">&#128465; Delete</button>' +
+    '</div>';
+  }).join('');
+}
+
+function filterSaved() {
+  renderSavedList(document.getElementById('searchInput').value);
+}
+
+function viewSaved(id) {
+  var data = savedDocs.find(function(d) { return d.id === id; });
+  if (!data) return;
+  renderPreview(data);
+  showScreen('preview');
+}
+
+function calcGrand(doc) {
+  var subtotal = (doc.items || []).reduce(function(s, it) { return s + (it.total || 0); }, 0);
+  var afterDiscount = subtotal - (doc.discount || 0);
+  var tax = afterDiscount * ((doc.taxPercent || 0) / 100);
+  return afterDiscount + tax + (doc.extraCharges || 0);
+}
+
+// ===== SETTINGS =====
+function populateSettings() {
+  document.getElementById('bizName').value = settings.bizName || '';
+  document.getElementById('bizOwner').value = settings.bizOwner || '';
+  document.getElementById('bizPhone').value = settings.bizPhone || '';
+  document.getElementById('bizEmail').value = settings.bizEmail || '';
+  document.getElementById('bizAddress').value = settings.bizAddress || '';
+  document.getElementById('bizGST').value = settings.bizGST || '';
+  document.getElementById('currencySymbol').value = settings.currency || '\u20B9';
+  document.getElementById('thankMsg').value = settings.thankMsg || '';
+  document.getElementById('defaultTerms').value = settings.defaultTerms || '';
+
+  var logoArea = document.getElementById('logoUploadArea');
+  if (settings.logoData) {
+    logoArea.innerHTML = '<img src="' + settings.logoData + '" alt="Logo">';
+  } else {
+    logoArea.innerHTML = '<span class="upload-icon">&#128247;</span><span class="upload-text">Tap to upload</span>';
+  }
+}
+
+async function saveSettings() {
+  settings.bizName = document.getElementById('bizName').value;
+  settings.bizOwner = document.getElementById('bizOwner').value;
+  settings.bizPhone = document.getElementById('bizPhone').value;
+  settings.bizEmail = document.getElementById('bizEmail').value;
+  settings.bizAddress = document.getElementById('bizAddress').value;
+  settings.bizGST = document.getElementById('bizGST').value;
+  settings.currency = document.getElementById('currencySymbol').value;
+  settings.thankMsg = document.getElementById('thankMsg').value;
+  settings.defaultTerms = document.getElementById('defaultTerms').value;
+
+  try {
+    if (db) {
+      await idbPut('settings', { key: 'main', ...settings });
+    } else {
+      localStorage.setItem('qm_settings', JSON.stringify(settings));
+    }
+    applySettings();
+    showToast('Settings saved!');
+    showScreen('home');
+  } catch(e) {
+    console.error('Settings save error:', e);
+    showToast('Error saving settings');
+  }
+}
+
+async function loadSettings() {
+  if (!db) { loadSettingsLS(); return; }
+  try {
+    var saved = await idbGet('settings', 'main');
+    if (saved) {
+      var key = saved.key;
+      delete saved.key;
+      settings = { ...settings, ...saved };
+    }
+  } catch(e) { loadSettingsLS(); }
+}
+
+function loadSettingsLS() {
+  var saved = localStorage.getItem('qm_settings');
+  if (saved) {
+    try { settings = { ...settings, ...JSON.parse(saved) }; } catch(e) {}
+  }
+}
+
+async function loadSavedDocs() {
+  if (!db) { loadSavedDocsLS(); return; }
+  try {
+    savedDocs = await idbGetAll('documents');
+    savedDocs.sort(function(a, b) { return (a.id || 0) - (b.id || 0); });
+  } catch(e) { loadSavedDocsLS(); }
+}
+
+function loadSavedDocsLS() {
+  var saved = localStorage.getItem('qm_docs');
+  if (saved) {
+    try { savedDocs = JSON.parse(saved); } catch(e) { savedDocs = []; }
+  }
+}
+
+function applySettings() {
+  if (settings.bizName) {
+    document.getElementById('appTitle').textContent = settings.bizName;
+    document.getElementById('appSubtitle').textContent = 'Bill & Quotation Generator';
+  }
+}
+
+function handleLogo(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  // Compress image for mobile storage
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxSize = 200;
+      var w = img.width, h = img.height;
+      if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+      else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      settings.logoData = canvas.toDataURL('image/jpeg', 0.8);
+      var logoArea = document.getElementById('logoUploadArea');
+      logoArea.innerHTML = '<img src="' + settings.logoData + '" alt="Logo">';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function clearAllData() {
+  if (!confirm('This will delete ALL your saved documents and settings. Are you sure?')) return;
+  try {
+    if (db) {
+      await idbClear('documents');
+      await idbClear('settings');
+    }
+    localStorage.removeItem('qm_docs');
+    localStorage.removeItem('qm_settings');
+    savedDocs = [];
+    settings = { bizName: '', bizOwner: '', bizPhone: '', bizEmail: '', bizAddress: '', bizGST: '', logoData: '', currency: '\u20B9', thankMsg: 'Thank you for your business!', defaultTerms: '' };
+    populateSettings();
+    renderSavedList();
+    renderRecentList();
+    applySettings();
+    document.getElementById('appTitle').textContent = 'QuoteMaster';
+    showToast('All data cleared');
+  } catch(e) {
+    console.error('Clear error:', e);
+  }
+}
+
+// ===== SHARE AS IMAGE (No external libs needed!) =====
+async function shareAsImage() {
+  showToast('Creating image...');
+  var content = document.getElementById('pdfContent');
+  if (!content) { showToast('Nothing to share'); return; }
+
+  try {
+    // Use canvas-based screenshot (built into modern mobile browsers)
+    var canvas = document.createElement('canvas');
+    var rect = content.getBoundingClientRect();
+    var scale = 2;
+    canvas.width = rect.width * scale;
+    canvas.height = rect.height * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // Convert HTML to SVG foreignObject then to canvas
+    var svgData = '<svg xmlns="http://www.w3.org/2000/svg" width="' + rect.width + '" height="' + rect.height + '">' +
+      '<foreignObject width="100%" height="100%">' +
+      '<div xmlns="http://www.w3.org/1999/xhtml">' +
+      content.outerHTML.replace(/&/g,'&amp;') +
+      '</div></foreignObject></svg>';
+
+    // Simpler approach: generate a formatted text-based image
+    var docData = collectDocData();
+    var textContent = generateShareText(docData);
+
+    if (navigator.share) {
+      await navigator.share({
+        title: (docData.type === 'quotation' ? 'Quotation' : 'Bill') + ' - ' + (docData.customer.name || ''),
+        text: textContent
+      });
+      showToast('Shared!');
+    } else {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(textContent);
+      showToast('Copied to clipboard!');
+    }
+  } catch(err) {
+    if (err.name !== 'AbortError') {
+      // Fallback: copy text
+      try {
+        var docData2 = collectDocData();
+        var text = generateShareText(docData2);
+        await navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard!');
+      } catch(e) {
+        showToast('Could not share');
+      }
+    }
+  }
+}
+
+function shareAsText() {
+  var data = collectDocData();
+  var text = generateShareText(data);
+  var encoded = encodeURIComponent(text);
+  window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+
+function generateShareText(data) {
+  var cur = settings.currency;
+  var subtotal = data.items.reduce(function(s, it) { return s + it.total; }, 0);
+  var afterDiscount = subtotal - data.discount;
+  var tax = afterDiscount * (data.taxPercent / 100);
+  var grand = afterDiscount + tax + data.extraCharges;
+  var typeName = data.type === 'quotation' ? 'QUOTATION' : 'BILL / INVOICE';
+
+  var dateFormatted = data.date || '-';
+  try {
+    if (data.date) dateFormatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch(e) {}
+
+  var lines = [];
+  lines.push('═══════════════════');
+  lines.push('  ' + typeName);
+  lines.push('═══════════════════');
+  if (settings.bizName) lines.push(settings.bizName);
+  if (settings.bizPhone) lines.push('Ph: ' + settings.bizPhone);
+  if (settings.bizGST) lines.push('GST: ' + settings.bizGST);
+  lines.push('───────────────────');
+  lines.push('#' + (data.number || '-') + '  |  Date: ' + dateFormatted);
+  lines.push('');
+  lines.push('Customer: ' + (data.customer.name || '-'));
+  if (data.customer.phone) lines.push('Ph: ' + data.customer.phone);
+  lines.push('───────────────────');
+  lines.push('ITEMS:');
+
+  data.items.filter(function(it) { return it.desc || it.rate; }).forEach(function(it, i) {
+    lines.push((i+1) + '. ' + (it.desc || '-'));
+    lines.push('   ' + it.qty + ' x ' + cur + it.rate.toFixed(2) + ' = ' + cur + it.total.toFixed(2));
+  });
+
+  lines.push('───────────────────');
+  lines.push('Subtotal: ' + cur + subtotal.toFixed(2));
+  if (data.discount > 0) lines.push('Discount: -' + cur + data.discount.toFixed(2));
+  if (data.taxPercent > 0) lines.push('Tax (' + data.taxPercent + '%): ' + cur + tax.toFixed(2));
+  if (data.extraCharges > 0) lines.push('Extra: ' + cur + data.extraCharges.toFixed(2));
+  lines.push('═══════════════════');
+  lines.push('TOTAL: ' + cur + grand.toFixed(2));
+  lines.push('═══════════════════');
+  if (data.notes) { lines.push(''); lines.push('Notes: ' + data.notes); }
+  lines.push('');
+  lines.push(settings.thankMsg || 'Thank you for your business!');
+
+  return lines.join('\n');
+}
+
+// ===== EXPORT / IMPORT =====
+async function exportAllData() {
+  var exportObj = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    settings: settings,
+    documents: savedDocs
+  };
+  var json = JSON.stringify(exportObj, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'quotemaster_backup_' + new Date().toISOString().split('T')[0] + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Data exported!');
+}
+
+async function importData(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (data.settings) {
+        settings = { ...settings, ...data.settings };
+        if (db) await idbPut('settings', { key: 'main', ...settings });
+        else localStorage.setItem('qm_settings', JSON.stringify(settings));
+      }
+      if (data.documents && data.documents.length) {
+        for (var doc of data.documents) {
+          // Remove old id so it gets a new one
+          delete doc.id;
+          if (db) await idbPut('documents', doc);
+          else { doc.id = Date.now() + Math.random(); savedDocs.push(doc); }
+        }
+        if (!db) localStorage.setItem('qm_docs', JSON.stringify(savedDocs));
+        await loadSavedDocs();
+      }
+      applySettings();
+      renderRecentList();
+      renderSavedList();
+      populateSettings();
+      showToast('Data imported! (' + (data.documents || []).length + ' docs)');
+    } catch(err) {
+      console.error('Import error:', err);
+      showToast('Invalid backup file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ===== TOAST =====
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+// ===== PWA INSTALL =====
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+
+async function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  var result = await deferredPrompt.userChoice;
+  if (result.outcome === 'accepted') {
+    document.getElementById('installBanner').classList.remove('show');
+    showToast('App installed!');
+  }
+  deferredPrompt = null;
+}
+
+function dismissInstall() {
+  document.getElementById('installBanner').classList.remove('show');
+}
+
+window.addEventListener('appinstalled', function() {
+  document.getElementById('installBanner').classList.remove('show');
+  showToast('QuoteMaster installed!');
+});
+
+// ===== SERVICE WORKER REGISTRATION =====
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+      console.log('SW registered');
+    }).catch(function(err) {
+      console.log('SW registration skipped:', err.message);
+    });
+  });
+}
+
+// ===== START =====
+init();
+</script>
+</body>
+</html>
